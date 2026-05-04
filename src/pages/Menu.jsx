@@ -65,27 +65,36 @@ export default function Menu() {
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#f8f8f8', fontFamily: 'system-ui, sans-serif' }}>
-      
+
       {/* Header */}
-      <div style={{ position: 'relative', minHeight: 180 }}>
+      <div style={{ position: 'relative', height: 240, overflow: 'hidden' }}>
         {local.banner_url
-          ? <img src={local.banner_url} alt="banner" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
-          : <div style={{ background: color, height: 180 }} />
+          ? <img src={local.banner_url} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          : <div style={{ background: color, height: '100%' }} />
         }
         <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
-          padding: '40px 16px 60px', textAlign: 'center'
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'linear-gradient(rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.7) 100%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'flex-end', padding: '16px 16px 32px', textAlign: 'center'
         }}>
-          {local.logo_url && <img src={local.logo_url} alt={local.nombre} style={{ width: 64, height: 64, borderRadius: '50%', marginBottom: 8, objectFit: 'cover', border: '3px solid white' }} />}
-          <h1 style={{ color: 'white', margin: 0, fontSize: 22, fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{local.nombre}</h1>
-          {local.descripcion && <p style={{ color: 'rgba(255,255,255,0.9)', margin: '4px 0 0', fontSize: 13 }}>{local.descripcion}</p>}
-          {mesa && <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.2)', color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: 13, marginTop: 8 }}>Mesa {mesa}</div>}
+          {local.logo_url && (
+            <img src={local.logo_url} alt={local.nombre} style={{ width: 64, height: 64, borderRadius: '50%', marginBottom: 8, objectFit: 'cover', border: '3px solid white' }} />
+          )}
+          <h1 style={{ color: 'white', margin: 0, fontSize: 22, fontWeight: 700, textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>{local.nombre}</h1>
+          {local.descripcion && (
+            <p style={{ color: 'rgba(255,255,255,0.9)', margin: '4px 0 0', fontSize: 13 }}>{local.descripcion}</p>
+          )}
+          {mesa && (
+            <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.2)', color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: 13, marginTop: 8 }}>
+              Mesa {mesa}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Categorías */}
-      <div style={{ background: 'white', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginTop: -20, borderRadius: '20px 20px 0 0' }}>
+      <div style={{ background: 'white', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', borderRadius: '20px 20px 0 0', marginTop: -20 }}>
         <div style={{ display: 'flex', overflowX: 'auto', padding: '12px 16px', gap: 8, scrollbarWidth: 'none' }}>
           {categorias.map(cat => (
             <button key={cat.id} onClick={() => setCategoriaActiva(cat.id)} style={{
@@ -116,18 +125,20 @@ export default function Menu() {
                 )}
                 <div style={{ flex: 1 }}>
                   <p style={{ margin: 0, fontWeight: 600, fontSize: 15, color: '#1a1a1a' }}>{producto.nombre}</p>
-                  {producto.descripcion && <p style={{ margin: '4px 0', fontSize: 12, color: '#888', lineHeight: 1.4 }}>{producto.descripcion}</p>}
+                  {producto.descripcion && (
+                    <p style={{ margin: '4px 0', fontSize: 12, color: '#888', lineHeight: 1.4 }}>{producto.descripcion}</p>
+                  )}
                   <p style={{ margin: '6px 0 0', fontWeight: 700, fontSize: 16, color: color }}>
                     Gs. {producto.precio.toLocaleString()}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  {cant > 0 ? (
+                  {cant > 0 && (
                     <>
                       <button onClick={() => quitar(producto.id)} style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${color}`, background: 'white', color: color, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                       <span style={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{cant}</span>
                     </>
-                  ) : null}
+                  )}
                   <button onClick={() => producto.disponible && agregar(producto)} style={{
                     width: 32, height: 32, borderRadius: '50%', border: 'none',
                     background: producto.disponible ? color : '#ccc',
