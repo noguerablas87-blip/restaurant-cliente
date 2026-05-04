@@ -67,13 +67,12 @@ export default function Menu() {
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#f8f8f8', fontFamily: 'system-ui, sans-serif' }}>
       
       {/* Header */}
-      <div style={{ 
-  background: local.banner_url ? `url("${local.banner_url}") center/cover no-repeat` : color,
-  padding: '20px 16px 60px', 
-  position: 'relative' 
-}}>
-        <div style={{ textAlign: 'center' }}>
-          {local.logo_url && <img src={local.logo_url} alt={local.nombre} style={{ width: 64, height: 64, borderRadius: '50%', marginBottom: 8, objectFit: 'cover' }} />}
+      <div style={{ background: color, position: 'relative' }}>
+        {local.banner_url && (
+          <img src={local.banner_url} alt="banner" style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }} />
+        )}
+        <div style={{ padding: '16px 16px 60px', textAlign: 'center' }}>
+          {local.logo_url && <img src={local.logo_url} alt={local.nombre} style={{ width: 64, height: 64, borderRadius: '50%', marginBottom: 8, objectFit: 'cover', border: '3px solid white' }} />}
           <h1 style={{ color: 'white', margin: 0, fontSize: 22, fontWeight: 700 }}>{local.nombre}</h1>
           {local.descripcion && <p style={{ color: 'rgba(255,255,255,0.8)', margin: '4px 0 0', fontSize: 13 }}>{local.descripcion}</p>}
           {mesa && <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.2)', color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: 13, marginTop: 8 }}>Mesa {mesa}</div>}
