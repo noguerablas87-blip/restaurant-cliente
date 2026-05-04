@@ -67,7 +67,11 @@ export default function Menu() {
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#f8f8f8', fontFamily: 'system-ui, sans-serif' }}>
       
       {/* Header */}
-      <div style={{ background: color, padding: '20px 16px 60px', position: 'relative' }}>
+      <div style={{ 
+  background: local.banner_url ? `url(${local.banner_url}) center/cover` : color, 
+  padding: '20px 16px 60px', 
+  position: 'relative' 
+}}>
         <div style={{ textAlign: 'center' }}>
           {local.logo_url && <img src={local.logo_url} alt={local.nombre} style={{ width: 64, height: 64, borderRadius: '50%', marginBottom: 8, objectFit: 'cover' }} />}
           <h1 style={{ color: 'white', margin: 0, fontSize: 22, fontWeight: 700 }}>{local.nombre}</h1>
