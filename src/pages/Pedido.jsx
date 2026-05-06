@@ -5,17 +5,25 @@ import { useCarrito } from '../context/CarritoContext'
 
 const API = 'https://restaurant-backend-production-1271.up.railway.app'
 
+const METODOS_PAGO = [
+  { id: 'efectivo',  icon: '💵', label: 'Efectivo',          sub: 'Al recibir el pedido' },
+  { id: 'billetera', icon: '📱', label: 'Billetera digital', sub: 'Tigo Money / Personal Pay' },
+  { id: 'tarjeta',   icon: '💳', label: 'Tarjeta',           sub: 'Débito o crédito' },
+]
+
 export default function Pedido() {
   const { slug } = useParams()
   const [searchParams] = useSearchParams()
   const mesa = searchParams.get('mesa')
   const navigate = useNavigate()
   const { items, quitar, agregar, total, limpiar, local } = useCarrito()
+
   const [nombre, setNombre] = useState('')
   const [nota, setNota] = useState('')
+  const [metodoPago, setMetodoPago] = useState('efectivo')
   const [enviando, setEnviando] = useState(false)
 
-  const color = local?.color_primario || '#1D9E75'
+  const color = local?.color_primario || '#b91c1c'
 
   const confirmar = async () => {
     if (items.length === 0) return
@@ -26,6 +34,7 @@ export default function Pedido() {
         numero_mesa: mesa ? parseInt(mesa) : null,
         nombre_cliente: nombre || null,
         nota_general: nota || null,
+        metodo_pago: metodoPago,
         items: items.map(i => ({
           producto_id: i.id,
           cantidad: i.cantidad,
@@ -41,77 +50,180 @@ export default function Pedido() {
     }
   }
 
+  const inputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    border: '1.5px solid #ebebeb', borderRadius: 10,
+    padding: '10px 12px', fontSize: 14,
+    background: '#fafafa', color: '#333',
+    outline: 'none', fontFamily: 'inherit',
+    transition: 'border-color 0.15s',
+  }
+
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#f8f8f8', fontFamily: 'system-ui, sans-serif' }}>
-      
-      {/* Header */}
-      <div style={{ background: color, padding: '16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 36, height: 36, color: 'white', fontSize: 20, cursor: 'pointer' }}>←</button>
-        <h2 style={{ color: 'white', margin: 0, fontSize: 18 }}>Tu pedido</h2>
-        {mesa && <span style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', color: 'white', padding: '4px 12px', borderRadius: 20, fontSize: 13 }}>Mesa {mesa}</span>}
+    <div style={{
+      maxWidth: 480, margin: '0 auto', minHeight: '100vh',
+      background: '#f4f4f4', fontFamily: "'Segoe UI', system-ui, sans-serif"
+    }}>
+
+      {/* ── HEADER ── */}
+      <div style={{
+        background: color, padding: '14px 16px',
+        display: 'flex', alignItems: 'center', gap: 10
+      }}>
+        <button onClick={() => navigate(-1)} style={{
+          background: 'rgba(255,255,255,0.2)', border: 'none',
+          borderRadius: '50%', width: 34, height: 34,
+          color: 'white', fontSize: 18, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>←</button>
+        <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700, flex: 1 }}>Tu pedido</h2>
+        {mesa && (
+          <span style={{
+            background: 'rgba(255,255,255,0.2)', color: 'white',
+            padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600
+          }}>Mesa {mesa}</span>
+        )}
       </div>
 
-      <div style={{ padding: 16, paddingBottom: 120 }}>
+      <div style={{ padding: '14px 14px 120px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* Items */}
-        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 16 }}>
-          {items.map(item => (
-            <div key={item.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: 15 }}>{item.nombre}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#888' }}>Gs. {item.precio.toLocaleString()} c/u</p>
+        {/* ── ITEMS + TOTAL ── */}
+        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: '1px solid #efefef' }}>
+          {items.map((item, idx) => (
+            <div key={item.id} style={{
+              padding: '12px 14px',
+              borderBottom: idx < items.length - 1 ? '1px solid #f4f4f4' : 'none',
+              display: 'flex', alignItems: 'center', gap: 10
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#111' }}>{item.nombre}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>Gs. {item.precio.toLocaleString()} c/u</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => quitar(item.id)} style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${color}`, background: 'white', color: color, fontSize: 16, cursor: 'pointer' }}>−</button>
-                <span style={{ fontWeight: 700, minWidth: 20, textAlign: 'center' }}>{item.cantidad}</span>
-                <button onClick={() => agregar(item)} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: color, color: 'white', fontSize: 16, cursor: 'pointer' }}>+</button>
+
+              {/* Control +/- */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+                <button onClick={() => quitar(item.id)} style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  border: `1.5px solid ${color}`, background: 'white',
+                  color: color, fontSize: 16, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, lineHeight: 1,
+                }}>−</button>
+                <span style={{ fontWeight: 700, minWidth: 18, textAlign: 'center', fontSize: 15 }}>{item.cantidad}</span>
+                <button onClick={() => agregar(item)} style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  border: 'none', background: color,
+                  color: 'white', fontSize: 16, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, lineHeight: 1,
+                }}>+</button>
               </div>
-              <p style={{ margin: 0, fontWeight: 700, color: color, minWidth: 80, textAlign: 'right', fontSize: 14 }}>
+
+              {/* Subtotal */}
+              <p style={{
+                margin: 0, fontWeight: 700, color: color,
+                minWidth: 82, textAlign: 'right', fontSize: 14, flexShrink: 0
+              }}>
                 Gs. {(item.precio * item.cantidad).toLocaleString()}
               </p>
             </div>
           ))}
-          <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 700, fontSize: 16 }}>Total</span>
-            <span style={{ fontWeight: 800, fontSize: 20, color: color }}>Gs. {total.toLocaleString()}</span>
+
+          {/* Total — se actualiza en tiempo real via contexto */}
+          <div style={{
+            padding: '13px 14px',
+            borderTop: '1.5px solid #f0f0f0',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            background: '#fafafa',
+          }}>
+            <span style={{ fontWeight: 600, fontSize: 14, color: '#555' }}>Total</span>
+            <span style={{ fontWeight: 800, fontSize: 22, color: color }}>
+              Gs. {total.toLocaleString()}
+            </span>
           </div>
         </div>
 
-        {/* Datos opcionales */}
-        <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: 16 }}>
-          <p style={{ margin: '0 0 12px', fontWeight: 600, fontSize: 15 }}>Datos opcionales</p>
+        {/* ── DATOS OPCIONALES ── */}
+        <div style={{ background: 'white', borderRadius: 16, padding: '14px', border: '1px solid #efefef' }}>
+          <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#aaa', letterSpacing: 1, textTransform: 'uppercase' }}>
+            Datos opcionales
+          </p>
           <input
             placeholder="Tu nombre (opcional)"
             value={nombre}
             onChange={e => setNombre(e.target.value)}
-            style={{ width: '100%', border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 12px', fontSize: 14, marginBottom: 10, boxSizing: 'border-box', outline: 'none' }}
+            style={{ ...inputStyle, marginBottom: 8 }}
           />
           <textarea
-            placeholder="Nota para la cocina (opcional) — ej: sin cebolla, bien cocido..."
+            placeholder="Nota para la cocina — ej: sin cebolla, bien cocido..."
             value={nota}
             onChange={e => setNota(e.target.value)}
             rows={3}
-            style={{ width: '100%', border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 12px', fontSize: 14, resize: 'none', boxSizing: 'border-box', outline: 'none' }}
+            style={{ ...inputStyle, resize: 'none' }}
           />
         </div>
 
-        {/* Pago */}
-        <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 15 }}>Pago</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#555', fontSize: 14 }}>
-            <span style={{ fontSize: 20 }}>💵</span>
-            <span>Efectivo al momento de recibir</span>
+        {/* ── MÉTODO DE PAGO ── */}
+        <div style={{ background: 'white', borderRadius: 16, padding: '14px', border: '1px solid #efefef' }}>
+          <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#aaa', letterSpacing: 1, textTransform: 'uppercase' }}>
+            Método de pago
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {METODOS_PAGO.map(m => {
+              const sel = metodoPago === m.id
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => setMetodoPago(m.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
+                    border: sel ? `2px solid ${color}` : '1.5px solid #ebebeb',
+                    background: sel ? `${color}08` : '#fafafa',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {/* Radio */}
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                    border: sel ? `5px solid ${color}` : '2px solid #ccc',
+                    background: sel ? color : 'white',
+                    transition: 'all 0.15s ease',
+                  }} />
+                  <span style={{ fontSize: 20, flexShrink: 0 }}>{m.icon}</span>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#111' }}>{m.label}</p>
+                    <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>{m.sub}</p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
+
       </div>
 
-      {/* Botón confirmar */}
-      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: 16, background: 'white', boxShadow: '0 -4px 20px rgba(0,0,0,0.1)' }}>
-        <button onClick={confirmar} disabled={enviando || items.length === 0} style={{
-          width: '100%', background: enviando ? '#ccc' : color,
-          color: 'white', border: 'none', borderRadius: 16,
-          padding: '16px', fontSize: 16, fontWeight: 700, cursor: 'pointer'
-        }}>
+      {/* ── BOTÓN CONFIRMAR ── */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: '50%',
+        transform: 'translateX(-50%)',
+        width: '100%', maxWidth: 480,
+        padding: '10px 14px 16px',
+        background: 'white', borderTop: '1px solid #f0f0f0',
+        zIndex: 100,
+      }}>
+        <button
+          onClick={confirmar}
+          disabled={enviando || items.length === 0}
+          style={{
+            width: '100%',
+            background: (enviando || items.length === 0) ? '#ccc' : color,
+            color: 'white', border: 'none', borderRadius: 14,
+            padding: '15px 16px', fontSize: 15, fontWeight: 700,
+            cursor: (enviando || items.length === 0) ? 'not-allowed' : 'pointer',
+          }}
+        >
           {enviando ? 'Enviando pedido...' : `Confirmar pedido — Gs. ${total.toLocaleString()}`}
         </button>
       </div>
