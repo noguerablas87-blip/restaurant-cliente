@@ -25,6 +25,9 @@ export default function Pedido() {
 
   const color = local?.color_primario || '#b91c1c'
 
+  // Total calculado directo de items para garantizar reactividad inmediata
+  const totalLocal = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0)
+
   const confirmar = async () => {
     if (items.length === 0) return
     setEnviando(true)
@@ -111,7 +114,7 @@ export default function Pedido() {
                   fontWeight: 700, lineHeight: 1,
                 }}>−</button>
                 <span style={{ fontWeight: 700, minWidth: 18, textAlign: 'center', fontSize: 15 }}>{item.cantidad}</span>
-                <button onClick={() => agregar(item)} style={{
+                <button onClick={() => agregar({ id: item.id, nombre: item.nombre, precio: item.precio })} style={{
                   width: 28, height: 28, borderRadius: '50%',
                   border: 'none', background: color,
                   color: 'white', fontSize: 16, cursor: 'pointer',
@@ -139,7 +142,7 @@ export default function Pedido() {
           }}>
             <span style={{ fontWeight: 600, fontSize: 14, color: '#555' }}>Total</span>
             <span style={{ fontWeight: 800, fontSize: 22, color: color }}>
-              Gs. {total.toLocaleString()}
+              Gs. {totalLocal.toLocaleString()}
             </span>
           </div>
         </div>
@@ -224,7 +227,7 @@ export default function Pedido() {
             cursor: (enviando || items.length === 0) ? 'not-allowed' : 'pointer',
           }}
         >
-          {enviando ? 'Enviando pedido...' : `Confirmar pedido — Gs. ${total.toLocaleString()}`}
+          {enviando ? 'Enviando pedido...' : `Confirmar pedido — Gs. ${totalLocal.toLocaleString()}`}
         </button>
       </div>
     </div>
