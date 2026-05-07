@@ -161,12 +161,10 @@ export default function Estado() {
     )
   }
 
-  if (pedidos.length === 0) return (
-    <div style={{ textAlign: 'center', padding: 40, fontFamily: 'system-ui, sans-serif' }}>
-      <p style={{ color: '#999' }}>No hay pedidos activos en esta mesa</p>
-    </div>
-  )
-
+  if (pedidos.length === 0) {
+  if (mesa && slug) navigate(`/${slug}?mesa=${mesa}`)
+  return null
+}
   const hayActivos = pedidos.some(p => ['pendiente', 'aceptado', 'listo'].includes(p.estado))
 
   return (
