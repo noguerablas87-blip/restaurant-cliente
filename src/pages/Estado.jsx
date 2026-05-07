@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useCarrito } from '../context/CarritoContext'
@@ -14,6 +14,7 @@ const ESTADOS = {
 }
 
 const PASOS = ['Recibido', 'Preparando', 'Listo']
+const SEGUNDOS_LIMPIEZA = 120 // 2 minutos antes de redirigir al menú
 
 function CountdownMinutos({ tiempoEstimado, minutosTranscurridos }) {
   const [segundos, setSegundos] = useState(0)
@@ -54,19 +55,38 @@ export default function Estado() {
   const { local } = useCarrito()
   const [pedidos, setPedidos] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [countdown, setCountdown] = useState(null) // segundos para redirigir
+  const countdownRef = useRef(null)
 
   const color = local?.color_primario || '#b91c1c'
 
   const cargarPedidos = async () => {
     try {
+      let data = []
       if (mesa && slug) {
-        // Cargar todos los pedidos activos de la mesa
         const res = await axios.get(`${API}/pedidos/mesa/${slug}/${mesa}`)
-        setPedidos(res.data)
+        data = res.data
       } else {
-        // Fallback: cargar solo el pedido individual
         const res = await axios.get(`${API}/pedidos/${pedidoId}/estado`)
-        setPedidos([res.data])
+        data = [res.data]
+      }
+      setPedidos(data)
+
+      // Verificar si todos están entregados
+      const todosEntregados = data.length > 0 && data.every(p => p.estado === 'entregado')
+      if (todosEntregados && data.length > 0) {
+        // Calcular cuántos segundos faltan para la redirección
+        // basado en el pedido entregado más reciente
+        const maxSegundos = Math.max(...data.map(p => p.segundos_desde_entrega || 0))
+        const restante = Math.max(0, SEGUNDOS_LIMPIEZA - maxSegundos)
+        setCountdown(restante)
+      } else {
+        // Si hay pedidos activos, cancelar countdown
+        setCountdown(null)
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current)
+          countdownRef.current = null
+        }
       }
     } catch (e) {
       console.error(e)
@@ -75,11 +95,32 @@ export default function Estado() {
     }
   }
 
+  // Refresco del backend cada 15s
   useEffect(() => {
     cargarPedidos()
-    const interval = setInterval(cargarPedidos, 30000)
+    const interval = setInterval(cargarPedidos, 15000)
     return () => clearInterval(interval)
   }, [pedidoId, slug, mesa])
+
+  // Countdown local de redirección
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown <= 0) {
+      navigate(`/${slug}?mesa=${mesa}`)
+      return
+    }
+    countdownRef.current = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) {
+          clearInterval(countdownRef.current)
+          navigate(`/${slug}?mesa=${mesa}`)
+          return 0
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(countdownRef.current)
+  }, [countdown])
 
   if (cargando) return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fafafa', fontFamily: 'system-ui, sans-serif' }}>
@@ -89,6 +130,36 @@ export default function Estado() {
       </div>
     </div>
   )
+
+  // Pantalla de "todos entregados" con countdown
+  if (countdown !== null) {
+    return (
+      <div style={{
+        maxWidth: 480, margin: '0 auto', minHeight: '100vh',
+        background: '#f4f4f4', fontFamily: "'Segoe UI', system-ui, sans-serif",
+        display: 'flex', flexDirection: 'column'
+      }}>
+        <div style={{ background: color, padding: '22px 16px 28px', textAlign: 'center' }}>
+          <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700 }}>Seguimiento del pedido</h2>
+          <p style={{ color: 'rgba(255,255,255,0.78)', margin: '4px 0 0', fontSize: 13 }}>
+            {mesa ? `Mesa ${mesa}` : ''}
+          </p>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'white', borderRadius: 20, padding: 32, textAlign: 'center', border: '1px solid #efefef', width: '100%' }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>✅</div>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#27ae60' }}>¡Buen provecho!</h2>
+            <p style={{ margin: '8px 0 0', color: '#aaa', fontSize: 14 }}>Tu pedido fue entregado</p>
+            <div style={{ marginTop: 24, background: '#f5f5f5', borderRadius: 12, padding: '16px' }}>
+              <p style={{ margin: 0, fontSize: 12, color: '#999' }}>Nueva sesión en</p>
+              <p style={{ margin: '4px 0 0', fontWeight: 800, fontSize: 36, color: '#111', lineHeight: 1 }}>{countdown}</p>
+              <p style={{ margin: 0, fontSize: 12, color: '#999' }}>segundos</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (pedidos.length === 0) return (
     <div style={{ textAlign: 'center', padding: 40, fontFamily: 'system-ui, sans-serif' }}>
@@ -104,11 +175,8 @@ export default function Estado() {
       background: '#f4f4f4', fontFamily: "'Segoe UI', system-ui, sans-serif"
     }}>
 
-      {/* Header */}
       <div style={{ background: color, padding: '22px 16px 28px', textAlign: 'center' }}>
-        <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700 }}>
-          Seguimiento del pedido
-        </h2>
+        <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700 }}>Seguimiento del pedido</h2>
         <p style={{ color: 'rgba(255,255,255,0.78)', margin: '4px 0 0', fontSize: 13 }}>
           {mesa ? `Mesa ${mesa}` : `Pedido #${pedidoId}`}
         </p>
@@ -119,12 +187,10 @@ export default function Estado() {
         {pedidos.map((p, idx) => {
           const estadoInfo = ESTADOS[p.estado] || ESTADOS.pendiente
           const pasoActual = estadoInfo.paso
-          const esAceptado = p.estado === 'aceptado'
 
           return (
             <div key={p.id || idx} style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: '1px solid #efefef' }}>
 
-              {/* Cabecera del pedido */}
               <div style={{ padding: '14px 16px', borderBottom: '1px solid #f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 22 }}>{estadoInfo.emoji}</span>
@@ -138,7 +204,6 @@ export default function Estado() {
                 </span>
               </div>
 
-              {/* Items del pedido */}
               <div style={{ padding: '12px 16px' }}>
                 {p.items?.map((item, i) => (
                   <div key={i} style={{ fontSize: 13, color: '#555', marginBottom: 3, display: 'flex', gap: 6 }}>
@@ -154,17 +219,12 @@ export default function Estado() {
                 )}
               </div>
 
-              {/* Countdown si está en preparación */}
-              {esAceptado && (
+              {p.estado === 'aceptado' && (
                 <div style={{ padding: '0 16px 14px' }}>
-                  <CountdownMinutos
-                    tiempoEstimado={p.tiempo_estimado}
-                    minutosTranscurridos={p.minutos_transcurridos}
-                  />
+                  <CountdownMinutos tiempoEstimado={p.tiempo_estimado} minutosTranscurridos={p.minutos_transcurridos} />
                 </div>
               )}
 
-              {/* Estado pendiente */}
               {p.estado === 'pendiente' && (
                 <div style={{ padding: '0 16px 14px' }}>
                   <div style={{ background: '#fff8e1', borderRadius: 12, padding: '10px 14px', textAlign: 'center' }}>
@@ -176,7 +236,6 @@ export default function Estado() {
                 </div>
               )}
 
-              {/* Listo */}
               {p.estado === 'listo' && (
                 <div style={{ padding: '0 16px 14px' }}>
                   <div style={{ background: '#f0fff4', borderRadius: 12, padding: '10px 14px', textAlign: 'center' }}>
@@ -186,7 +245,6 @@ export default function Estado() {
                 </div>
               )}
 
-              {/* Pasos */}
               {p.estado !== 'cancelado' && p.estado !== 'entregado' && (
                 <div style={{ padding: '0 16px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -212,7 +270,6 @@ export default function Estado() {
           )
         })}
 
-        {/* Indicador auto-refresh */}
         {hayActivos && (
           <div style={{ background: 'white', borderRadius: 14, padding: '12px 16px', border: '1px solid #efefef', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
@@ -221,7 +278,6 @@ export default function Estado() {
         )}
       </div>
 
-      {/* Botón agregar más items */}
       {hayActivos && mesa && (
         <div style={{
           position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
