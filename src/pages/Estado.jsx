@@ -138,6 +138,27 @@ function AnimacionEntregado() {
   )
 }
 
+
+// ── Sonido listo Web Audio API ────────────────────────────────────────────────
+function sonarPedidoListo() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    // Melodía alegre: do-mi-sol
+    [[0, 523], [0.2, 659], [0.4, 784], [0.6, 1047]].forEach(([t, freq]) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.35, ctx.currentTime + t)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.4)
+      osc.start(ctx.currentTime + t)
+      osc.stop(ctx.currentTime + t + 0.4)
+    })
+  } catch (e) {}
+}
+
 // ── Countdown minutos ────────────────────────────────────────────────────────
 
 function CountdownMinutos({ tiempoEstimado, minutosTranscurridos }) {
@@ -182,6 +203,19 @@ export default function Estado() {
   const [cargando, setCargando] = useState(true)
   const [countdown, setCountdown] = useState(null)
   const countdownRef = useRef(null)
+  const pedidosAntRef = useRef([])
+
+  // Detectar cuando un pedido cambia a listo y sonar
+  useEffect(() => {
+    const ant = pedidosAntRef.current
+    pedidos.forEach(p => {
+      const anterior = ant.find(a => a.id === p.id)
+      if (anterior && anterior.estado !== 'listo' && p.estado === 'listo') {
+        sonarPedidoListo()
+      }
+    })
+    pedidosAntRef.current = pedidos
+  }, [pedidos])
 
   const color = local?.color_primario || '#b91c1c'
 
@@ -228,30 +262,30 @@ export default function Estado() {
   }, [countdown])
 
   if (cargando) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fafafa', fontFamily: 'system-ui' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#252525', fontFamily: 'system-ui' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
-        <p style={{ color: '#bbb', fontSize: 12, letterSpacing: 2, fontWeight: 600 }}>CARGANDO...</p>
+        <p style={{ color: '#555', fontSize: 12, letterSpacing: 2, fontWeight: 600 }}>CARGANDO...</p>
       </div>
     </div>
   )
 
   // Pantalla buen provecho
   if (countdown !== null) return (
-    <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#f4f4f4', fontFamily: "'Segoe UI', system-ui" }}>
+    <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#111111', fontFamily: "'Segoe UI', system-ui" }}>
       <div style={{ background: color, padding: '22px 16px 28px', textAlign: 'center' }}>
         <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700 }}>Seguimiento del pedido</h2>
         <p style={{ color: 'rgba(255,255,255,0.78)', margin: '4px 0 0', fontSize: 13 }}>{mesa ? `Mesa ${mesa}` : ''}</p>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ background: 'white', borderRadius: 20, padding: 32, textAlign: 'center', border: '1px solid #efefef', width: '100%' }}>
+        <div style={{ background: '#1e1e1e', borderRadius: 20, padding: 32, textAlign: 'center', border: '1px solid #2a2a2a', width: '100%' }}>
           <AnimacionEntregado />
           <h2 style={{ margin: '12px 0 0', fontSize: 22, fontWeight: 800, color: '#27ae60' }}>¡Buen provecho!</h2>
-          <p style={{ margin: '8px 0 0', color: '#aaa', fontSize: 14 }}>Tu pedido fue entregado</p>
-          <div style={{ marginTop: 24, background: '#f5f5f5', borderRadius: 12, padding: '16px' }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#999' }}>Nueva sesión en</p>
-            <p style={{ margin: '4px 0 0', fontWeight: 800, fontSize: 36, color: '#111', lineHeight: 1 }}>{countdown}</p>
-            <p style={{ margin: 0, fontSize: 12, color: '#999' }}>segundos</p>
+          <p style={{ margin: '8px 0 0', color: '#666', fontSize: 14 }}>Tu pedido fue entregado</p>
+          <div style={{ marginTop: 24, background: '#252525', borderRadius: 12, padding: '16px' }}>
+            <p style={{ margin: 0, fontSize: 12, color: '#666' }}>Nueva sesión en</p>
+            <p style={{ margin: '4px 0 0', fontWeight: 800, fontSize: 36, color: 'white', lineHeight: 1 }}>{countdown}</p>
+            <p style={{ margin: 0, fontSize: 12, color: '#666' }}>segundos</p>
           </div>
         </div>
       </div>
@@ -266,7 +300,7 @@ export default function Estado() {
   const hayActivos = pedidos.some(p => ['pendiente', 'aceptado', 'listo'].includes(p.estado))
 
   return (
-    <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#f4f4f4', fontFamily: "'Segoe UI', system-ui" }}>
+    <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#111111', fontFamily: "'Segoe UI', system-ui" }}>
 
       <div style={{ background: color, padding: '22px 16px 28px', textAlign: 'center' }}>
         <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700 }}>Seguimiento del pedido</h2>
@@ -282,7 +316,7 @@ export default function Estado() {
           const estadoLabel = { pendiente: 'Recibido', aceptado: 'Preparando', listo: '¡Listo!', entregado: 'Entregado', cancelado: 'Cancelado' }[p.estado] || ''
 
           return (
-            <div key={p.id || idx} style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: '1px solid #efefef' }}>
+            <div key={p.id || idx} style={{ background: '#1e1e1e', borderRadius: 16, overflow: 'hidden', border: '1px solid #2a2a2a' }}>
 
               {/* Animación del estado */}
               <div style={{ padding: '20px 16px 8px', textAlign: 'center' }}>
@@ -292,26 +326,26 @@ export default function Estado() {
                 {p.estado === 'entregado' && <AnimacionEntregado />}
                 {p.estado === 'cancelado' && <div style={{ fontSize: 52, lineHeight: 1 }}>❌</div>}
                 <p style={{ margin: '8px 0 0', fontWeight: 800, fontSize: 18, color: estadoColor }}>{estadoLabel}</p>
-                <p style={{ margin: 0, fontSize: 11, color: '#aaa' }}>Pedido #{p.id || p.pedido_id}</p>
+                <p style={{ margin: 0, fontSize: 11, color: '#666' }}>Pedido #{p.id || p.pedido_id}</p>
               </div>
 
               {/* Cabecera total */}
               <div style={{ padding: '0 16px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: '#999' }}>{p.items?.length} producto{p.items?.length !== 1 ? 's' : ''}</span>
-                <span style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Gs. {parseInt(p.total).toLocaleString()}</span>
+                <span style={{ fontSize: 13, color: '#666' }}>{p.items?.length} producto{p.items?.length !== 1 ? 's' : ''}</span>
+                <span style={{ fontWeight: 800, fontSize: 15, color: 'white' }}>Gs. {parseInt(p.total).toLocaleString()}</span>
               </div>
 
               {/* Items */}
-              <div style={{ padding: '0 16px 12px', borderTop: '1px solid #f5f5f5', paddingTop: 10 }}>
+              <div style={{ padding: '0 16px 12px', borderTop: '1px solid #2a2a2a', paddingTop: 10 }}>
                 {p.items?.map((item, i) => (
-                  <div key={i} style={{ fontSize: 13, color: '#555', marginBottom: 3, display: 'flex', gap: 6 }}>
+                  <div key={i} style={{ fontSize: 13, color: '#666', marginBottom: 3, display: 'flex', gap: 6 }}>
                     <span style={{ fontWeight: 600 }}>{item.cantidad}×</span>
                     <span>{item.nombre}</span>
-                    {item.nota && <span style={{ color: '#bbb' }}>— {item.nota}</span>}
+                    {item.nota && <span style={{ color: '#555' }}>— {item.nota}</span>}
                   </div>
                 ))}
                 {p.nota_general && (
-                  <div style={{ fontSize: 12, color: '#aaa', fontStyle: 'italic', marginTop: 6, background: '#fafafa', borderRadius: 8, padding: '6px 8px' }}>
+                  <div style={{ fontSize: 12, color: '#666', fontStyle: 'italic', marginTop: 6, background: '#252525', borderRadius: 8, padding: '6px 8px' }}>
                     📝 {p.nota_general}
                   </div>
                 )}
@@ -369,15 +403,15 @@ export default function Estado() {
         })}
 
         {hayActivos && (
-          <div style={{ background: 'white', borderRadius: 14, padding: '12px 16px', border: '1px solid #efefef', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: '#1e1e1e', borderRadius: 14, padding: '12px 16px', border: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-            <p style={{ margin: 0, fontSize: 13, color: '#999' }}>Esta página se actualiza automáticamente</p>
+            <p style={{ margin: 0, fontSize: 13, color: '#666' }}>Esta página se actualiza automáticamente</p>
           </div>
         )}
       </div>
 
       {hayActivos && mesa && (
-        <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '10px 14px 16px', background: 'white', borderTop: '1px solid #f0f0f0', zIndex: 100 }}>
+        <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '10px 14px 16px', background: '#1e1e1e', borderTop: '1px solid #f0f0f0', zIndex: 100 }}>
           <button onClick={() => navigate(`/${slug}?mesa=${mesa}`)} style={{ width: '100%', background: color, color: 'white', border: 'none', borderRadius: 14, padding: '15px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
             + Agregar más items al pedido
           </button>

@@ -55,9 +55,9 @@ export default function Pedido() {
 
   const inputStyle = {
     width: '100%', boxSizing: 'border-box',
-    border: '1.5px solid #ebebeb', borderRadius: 10,
+    border: '1.5px solid #333', borderRadius: 10,
     padding: '10px 12px', fontSize: 14,
-    background: '#fafafa', color: '#333',
+    background: '#1e1e1e', color: '#ccc',
     outline: 'none', fontFamily: 'inherit',
     transition: 'border-color 0.15s',
   }
@@ -65,7 +65,7 @@ export default function Pedido() {
   return (
     <div style={{
       maxWidth: 480, margin: '0 auto', minHeight: '100vh',
-      background: '#f4f4f4', fontFamily: "'Segoe UI', system-ui, sans-serif"
+      background: '#111111', fontFamily: "'Segoe UI', system-ui, sans-serif"
     }}>
 
       {/* ── HEADER ── */}
@@ -92,7 +92,7 @@ export default function Pedido() {
       <div style={{ padding: '14px 14px 120px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
         {/* ── ITEMS + TOTAL ── */}
-        <div style={{ background: 'white', borderRadius: 16, overflow: 'hidden', border: '1px solid #efefef' }}>
+        <div style={{ background: '#1e1e1e', borderRadius: 16, overflow: 'hidden', border: '1px solid #2a2a2a' }}>
           {items.map((item, idx) => (
             <div key={item.id} style={{
               padding: '12px 14px',
@@ -100,15 +100,15 @@ export default function Pedido() {
               display: 'flex', alignItems: 'center', gap: 10
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#111' }}>{item.nombre}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>Gs. {item.precio.toLocaleString()} c/u</p>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: 'white' }}>{item.nombre}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, color: '#666' }}>Gs. {item.precio.toLocaleString()} c/u</p>
               </div>
 
               {/* Control +/- */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
                 <button onClick={() => quitar(item.id)} style={{
                   width: 28, height: 28, borderRadius: '50%',
-                  border: `1.5px solid ${color}`, background: 'white',
+                  border: `1.5px solid ${color}`, background: '#1e1e1e',
                   color: color, fontSize: 16, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontWeight: 700, lineHeight: 1,
@@ -136,11 +136,11 @@ export default function Pedido() {
           {/* Total — se actualiza en tiempo real via contexto */}
           <div style={{
             padding: '13px 14px',
-            borderTop: '1.5px solid #f0f0f0',
+            borderTop: '1.5px solid #222',
             display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-            background: '#fafafa',
+            background: '#1e1e1e',
           }}>
-            <span style={{ fontWeight: 600, fontSize: 14, color: '#555' }}>Total</span>
+            <span style={{ fontWeight: 600, fontSize: 14, color: '#aaa' }}>Total</span>
             <span style={{ fontWeight: 800, fontSize: 22, color: color }}>
               Gs. {totalLocal.toLocaleString()}
             </span>
@@ -148,8 +148,8 @@ export default function Pedido() {
         </div>
 
         {/* ── DATOS OPCIONALES ── */}
-        <div style={{ background: 'white', borderRadius: 16, padding: '14px', border: '1px solid #efefef' }}>
-          <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#aaa', letterSpacing: 1, textTransform: 'uppercase' }}>
+        <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #2a2a2a' }}>
+          <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#666', letterSpacing: 1, textTransform: 'uppercase' }}>
             Datos opcionales
           </p>
           <input
@@ -168,8 +168,8 @@ export default function Pedido() {
         </div>
 
         {/* ── MÉTODO DE PAGO ── */}
-        <div style={{ background: 'white', borderRadius: 16, padding: '14px', border: '1px solid #efefef' }}>
-          <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#aaa', letterSpacing: 1, textTransform: 'uppercase' }}>
+        <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #2a2a2a' }}>
+          <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#666', letterSpacing: 1, textTransform: 'uppercase' }}>
             Método de pago
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -196,8 +196,8 @@ export default function Pedido() {
                   }} />
                   <span style={{ fontSize: 20, flexShrink: 0 }}>{m.icon}</span>
                   <div>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#111' }}>{m.label}</p>
-                    <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>{m.sub}</p>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'white' }}>{m.label}</p>
+                    <p style={{ margin: 0, fontSize: 12, color: '#666' }}>{m.sub}</p>
                   </div>
                 </div>
               )
@@ -213,7 +213,7 @@ export default function Pedido() {
         transform: 'translateX(-50%)',
         width: '100%', maxWidth: 480,
         padding: '10px 14px 16px',
-        background: 'white', borderTop: '1px solid #f0f0f0',
+        background: '#1e1e1e', borderTop: '1px solid #222',
         zIndex: 100,
       }}>
         <button

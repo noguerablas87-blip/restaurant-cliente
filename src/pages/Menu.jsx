@@ -16,6 +16,7 @@ export default function Menu() {
   const [categorias, setCategorias] = useState([])
   const [cargando, setCargando] = useState(true)
   const [categoriaActiva, setCategoriaActiva] = useState(null)
+  const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
     const cargar = async () => {
@@ -45,267 +46,273 @@ export default function Menu() {
     return item ? item.cantidad : 0
   }
 
+  // Productos filtrados por búsqueda
+  const productosFiltrados = busqueda.trim()
+    ? categorias.flatMap(c => c.productos.filter(p =>
+        p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        (p.descripcion && p.descripcion.toLowerCase().includes(busqueda.toLowerCase()))
+      )).map(p => ({ ...p, _busqueda: true }))
+    : null
+
   if (cargando) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#fafafa' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#1a1a1a' }}>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: 44, marginBottom: 12 }}>🍽️</div>
-        <p style={{ color: '#bbb', fontSize: 12, letterSpacing: 2, fontFamily: 'system-ui, sans-serif', fontWeight: 600 }}>CARGANDO MENÚ...</p>
+        <p style={{ color: '#666', fontSize: 12, letterSpacing: 2, fontFamily: 'system-ui', fontWeight: 600 }}>CARGANDO MENÚ...</p>
       </div>
     </div>
   )
 
   if (!local) return (
-    <div style={{ textAlign: 'center', padding: 40, fontFamily: 'system-ui, sans-serif' }}>
-      <p style={{ color: '#999' }}>Local no encontrado</p>
+    <div style={{ textAlign: 'center', padding: 40, background: '#1a1a1a', minHeight: '100vh', color: 'white', fontFamily: 'system-ui' }}>
+      <p>Local no encontrado</p>
     </div>
   )
 
-  const color = local.color_primario || '#b91c1c'
-  const colorDark = color  // se usa directo, el backend manda el hex
+  const color = local.color_primario || '#f59e0b'
   const categoriaActual = categorias.find(c => c.id === categoriaActiva)
 
   return (
     <div style={{
       maxWidth: 480, margin: '0 auto', minHeight: '100vh',
-      background: '#f4f4f4', fontFamily: "'Segoe UI', system-ui, sans-serif",
-      position: 'relative'
+      background: '#111111', fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: 'white'
     }}>
 
       {/* ── HERO ── */}
-      <div style={{ position: 'relative', height: 240, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', height: 260, overflow: 'hidden' }}>
         {local.banner_url
           ? <img src={local.banner_url} alt="banner" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          : <div style={{ background: `linear-gradient(160deg, ${color} 0%, ${color}aa 100%)`, height: '100%' }} />
+          : <div style={{ background: `linear-gradient(160deg, ${color}33 0%, #111 100%)`, height: '100%' }} />
         }
-        {/* Gradiente oscuro */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.72) 100%)',
-        }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.85) 100%)' }} />
 
         {/* Badge mesa */}
         {mesa && (
           <div style={{
             position: 'absolute', top: 16, right: 16,
-            background: 'rgba(0,0,0,0.4)',
-            backdropFilter: 'blur(8px)',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
             color: 'white', fontSize: 12, fontWeight: 600,
             padding: '5px 12px', borderRadius: 20,
-            border: '1px solid rgba(255,255,255,0.2)',
-            letterSpacing: 0.3
+            border: '1px solid rgba(255,255,255,0.15)',
           }}>
             🪑 Mesa {mesa}
           </div>
         )}
 
         {/* Info local */}
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px 18px 28px' }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 18px 20px', display: 'flex', alignItems: 'flex-end', gap: 14 }}>
           {local.logo_url && (
             <img src={local.logo_url} alt={local.nombre} style={{
-              width: 52, height: 52, borderRadius: '50%',
-              objectFit: 'cover', border: '2.5px solid white',
-              marginBottom: 8, display: 'block',
+              width: 72, height: 72, borderRadius: 16,
+              objectFit: 'cover', border: '2px solid rgba(255,255,255,0.2)',
+              flexShrink: 0, background: '#222'
             }} />
           )}
-          <h1 style={{
-            color: 'white', margin: 0, fontSize: 22, fontWeight: 800,
-            letterSpacing: -0.4, lineHeight: 1.2,
-            textShadow: '0 1px 6px rgba(0,0,0,0.4)'
-          }}>{local.nombre}</h1>
-          {local.descripcion && (
-            <p style={{ color: 'rgba(255,255,255,0.8)', margin: '4px 0 0', fontSize: 13, lineHeight: 1.4 }}>
-              {local.descripcion}
-            </p>
-          )}
+          <div>
+            <h1 style={{ color: 'white', margin: 0, fontSize: 22, fontWeight: 800, lineHeight: 1.2, textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>{local.nombre}</h1>
+            {local.descripcion && <p style={{ color: 'rgba(255,255,255,0.65)', margin: '4px 0 0', fontSize: 13 }}>{local.descripcion}</p>}
+          </div>
         </div>
       </div>
 
-      {/* ── CATEGORÍAS sticky ── */}
-      <div style={{
-        background: 'white',
-        position: 'sticky', top: 0, zIndex: 10,
-        borderRadius: '20px 20px 0 0',
-        marginTop: -20,
-        boxShadow: '0 -2px 0 rgba(0,0,0,0.04)',
-        borderBottom: '1px solid #f0f0f0'
-      }}>
-        <div style={{
-          display: 'flex', overflowX: 'auto',
-          padding: '14px 16px 12px', gap: 8,
-          scrollbarWidth: 'none', msOverflowStyle: 'none'
-        }}>
-          {categorias.map(cat => {
-            const activa = categoriaActiva === cat.id
-            return (
-              <button key={cat.id} onClick={() => setCategoriaActiva(cat.id)} style={{
-                flexShrink: 0,
-                background: activa ? color : 'transparent',
-                color: activa ? 'white' : '#777',
-                border: activa ? 'none' : '1.5px solid #e8e8e8',
-                borderRadius: 24, padding: '7px 16px',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.18s ease',
-                letterSpacing: 0.1,
-              }}>
-                {cat.nombre}
-              </button>
-            )
-          })}
+      {/* ── BUSCADOR ── */}
+      <div style={{ padding: '14px 14px 0', background: '#111' }}>
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 16, opacity: 0.4 }}>🔍</span>
+          <input
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            placeholder="Buscar productos..."
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              background: '#222', border: '1px solid #333',
+              borderRadius: 12, padding: '11px 14px 11px 40px',
+              fontSize: 14, color: 'white', outline: 'none',
+              fontFamily: 'inherit',
+            }}
+          />
         </div>
       </div>
+
+      {/* ── CATEGORÍAS ── */}
+      {!busqueda && (
+        <div style={{
+          background: '#111', position: 'sticky', top: 0, zIndex: 10,
+          borderBottom: '1px solid #222',
+        }}>
+          <div style={{ display: 'flex', overflowX: 'auto', padding: '12px 14px', gap: 8, scrollbarWidth: 'none' }}>
+            {categorias.map(cat => {
+              const activa = categoriaActiva === cat.id
+              return (
+                <button key={cat.id} onClick={() => setCategoriaActiva(cat.id)} style={{
+                  flexShrink: 0,
+                  background: activa ? color : 'transparent',
+                  color: activa ? '#000' : 'rgba(255,255,255,0.6)',
+                  border: activa ? 'none' : '1px solid #333',
+                  borderRadius: 20, padding: '7px 16px',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  whiteSpace: 'nowrap', fontFamily: 'inherit',
+                  transition: 'all 0.15s ease',
+                }}>
+                  {cat.nombre.toUpperCase()}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── PRODUCTOS ── */}
-      <div style={{ padding: '12px 14px', paddingBottom: cantidad > 0 ? 100 : 24 }}>
+      <div style={{ padding: '8px 0', paddingBottom: cantidad > 0 ? 100 : 24 }}>
 
-        {categoriaActual?.productos.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '48px 20px', color: '#bbb' }}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>🍽️</div>
-            <p style={{ fontSize: 14 }}>Sin productos en esta categoría</p>
+        {/* Resultados de búsqueda */}
+        {busqueda && (
+          <div>
+            {productosFiltrados.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: '#555' }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🔍</div>
+                <p style={{ fontSize: 14 }}>Sin resultados para "{busqueda}"</p>
+              </div>
+            )}
+            {productosFiltrados.map(producto => (
+              <ProductoCard key={producto.id} producto={producto} color={color} cantidad={getCantidad(producto.id)} agregar={agregar} quitar={quitar} />
+            ))}
           </div>
         )}
 
-        {categoriaActual?.productos.map(producto => {
-          const cant = getCantidad(producto.id)
-          return (
-            <div key={producto.id} style={{
-              background: 'white',
-              borderRadius: 16,
-              marginBottom: 10,
-              overflow: 'hidden',
-              border: '1px solid #efefef',
-              opacity: producto.disponible ? 1 : 0.55,
-            }}>
-              <div style={{ display: 'flex', padding: '12px 12px 12px 12px', gap: 12, alignItems: 'center' }}>
-
-                {/* Imagen o placeholder */}
-                {producto.imagen_url ? (
-                  <img src={producto.imagen_url} alt={producto.nombre} style={{
-                    width: 80, height: 80, borderRadius: 12,
-                    objectFit: 'cover', flexShrink: 0,
-                  }} />
-                ) : (
-                  <div style={{
-                    width: 80, height: 80, borderRadius: 12, flexShrink: 0,
-                    background: `${color}18`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 28,
-                  }}>🍽️</div>
-                )}
-
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{
-                    margin: 0, fontWeight: 700, fontSize: 14,
-                    color: '#111', lineHeight: 1.25,
-                    overflow: 'hidden', display: '-webkit-box',
-                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
-                  }}>{producto.nombre}</p>
-
-                  {producto.descripcion && (
-                    <p style={{
-                      margin: '3px 0 0', fontSize: 11.5, color: '#aaa',
-                      lineHeight: 1.4, overflow: 'hidden',
-                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
-                    }}>{producto.descripcion}</p>
-                  )}
-
-                  <p style={{
-                    margin: '7px 0 0', fontWeight: 800, fontSize: 16, color: color
-                  }}>
-                    Gs. {producto.precio.toLocaleString()}
-                  </p>
-                </div>
-
-                {/* Control cantidad */}
-                <div style={{ flexShrink: 0 }}>
-                  {cant > 0 ? (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      background: '#f6f6f6', borderRadius: 24, padding: '4px 6px'
-                    }}>
-                      <button
-                        onClick={() => quitar(producto.id)}
-                        style={{
-                          width: 30, height: 30, borderRadius: '50%',
-                          border: `1.5px solid ${color}`, background: 'white',
-                          color: color, fontSize: 18, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 700, lineHeight: 1,
-                        }}>−</button>
-                      <span style={{
-                        fontWeight: 800, fontSize: 15,
-                        minWidth: 20, textAlign: 'center', color: '#111'
-                      }}>{cant}</span>
-                      <button
-                        onClick={() => producto.disponible && agregar(producto)}
-                        style={{
-                          width: 30, height: 30, borderRadius: '50%',
-                          border: 'none', background: color,
-                          color: 'white', fontSize: 18, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 700, lineHeight: 1,
-                        }}>+</button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => producto.disponible && agregar(producto)}
-                      style={{
-                        width: 36, height: 36, borderRadius: '50%',
-                        border: 'none',
-                        background: producto.disponible ? color : '#ddd',
-                        color: 'white', fontSize: 22,
-                        cursor: producto.disponible ? 'pointer' : 'not-allowed',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 700, lineHeight: 1,
-                      }}>+</button>
-                  )}
-                </div>
+        {/* Menú normal por categoría */}
+        {!busqueda && (
+          <div>
+            {categoriaActual?.productos.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: '#555' }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🍽️</div>
+                <p style={{ fontSize: 14 }}>Sin productos en esta categoría</p>
               </div>
-
-              {!producto.disponible && (
-                <div style={{
-                  background: '#fff5f5', textAlign: 'center',
-                  padding: '5px', fontSize: 11.5, color: '#e53e3e', fontWeight: 600
-                }}>
-                  ⚠️ No disponible
-                </div>
-              )}
+            )}
+            <div style={{ padding: '0 14px' }}>
+              <h2 style={{ color: 'white', fontSize: 20, fontWeight: 800, margin: '16px 0 12px', letterSpacing: -0.3 }}>
+                {categoriaActual?.nombre.toUpperCase()}
+              </h2>
             </div>
-          )
-        })}
+            {categoriaActual?.productos.map(producto => (
+              <ProductoCard key={producto.id} producto={producto} color={color} cantidad={getCantidad(producto.id)} agregar={agregar} quitar={quitar} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── FAB CARRITO ── */}
       {cantidad > 0 && (
         <div style={{
-          position: 'fixed', bottom: 0, left: '50%',
-          transform: 'translateX(-50%)',
+          position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
           width: '100%', maxWidth: 480,
           padding: '10px 14px 16px',
-          background: 'white',
-          borderTop: '1px solid #f0f0f0',
+          background: 'linear-gradient(to top, #111 80%, transparent)',
           zIndex: 100,
         }}>
           <button
             onClick={() => navigate(`/${slug}/pedido${mesa ? `?mesa=${mesa}` : ''}`)}
             style={{
               width: '100%', background: color,
-              color: 'white', border: 'none', borderRadius: 14,
-              padding: '14px 16px', fontSize: 15, fontWeight: 700,
+              color: '#000', border: 'none', borderRadius: 14,
+              padding: '15px 16px', fontSize: 15, fontWeight: 800,
               cursor: 'pointer',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontFamily: 'inherit',
             }}>
             <span style={{
-              background: 'rgba(255,255,255,0.22)',
+              background: 'rgba(0,0,0,0.15)',
               borderRadius: 20, padding: '4px 12px',
               fontSize: 13, fontWeight: 700
             }}>
               {cantidad} {cantidad === 1 ? 'item' : 'items'}
             </span>
-            <span style={{ fontSize: 14 }}>Ver pedido</span>
-            <span style={{ fontWeight: 800 }}>Gs. {total.toLocaleString()} →</span>
+            <span>Ver pedido</span>
+            <span>Gs. {total.toLocaleString()} →</span>
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProductoCard({ producto, color, cantidad, agregar, quitar }) {
+  return (
+    <div style={{
+      margin: '0 14px 10px',
+      background: '#1e1e1e',
+      borderRadius: 16,
+      overflow: 'hidden',
+      border: '1px solid #2a2a2a',
+      opacity: producto.disponible ? 1 : 0.4,
+    }}>
+      <div style={{ display: 'flex', gap: 0 }}>
+        {/* Info */}
+        <div style={{ flex: 1, padding: '14px 14px 14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: 'white', lineHeight: 1.3 }}>{producto.nombre}</p>
+            {producto.descripcion && (
+              <p style={{
+                margin: '5px 0 0', fontSize: 12, color: '#888', lineHeight: 1.5,
+                overflow: 'hidden', display: '-webkit-box',
+                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'
+              }}>{producto.descripcion}</p>
+            )}
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <p style={{ margin: 0, fontWeight: 800, fontSize: 17, color: color }}>
+              ₲ {producto.precio.toLocaleString()}
+            </p>
+            {/* Control cantidad */}
+            {cantidad > 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#2a2a2a', borderRadius: 24, padding: '4px 8px' }}>
+                <button onClick={() => quitar(producto.id)} style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  border: `1.5px solid ${color}`, background: 'transparent',
+                  color: color, fontSize: 18, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, lineHeight: 1,
+                }}>−</button>
+                <span style={{ fontWeight: 800, fontSize: 15, minWidth: 18, textAlign: 'center', color: 'white' }}>{cantidad}</span>
+                <button onClick={() => producto.disponible && agregar(producto)} style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  border: 'none', background: color,
+                  color: '#000', fontSize: 18, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 700, lineHeight: 1,
+                }}>+</button>
+              </div>
+            ) : (
+              <button onClick={() => producto.disponible && agregar(producto)} style={{
+                width: 34, height: 34, borderRadius: '50%',
+                border: 'none', background: producto.disponible ? color : '#333',
+                color: '#000', fontSize: 20, cursor: producto.disponible ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, lineHeight: 1,
+              }}>+</button>
+            )}
+          </div>
+        </div>
+
+        {/* Imagen */}
+        {producto.imagen_url ? (
+          <img src={producto.imagen_url} alt={producto.nombre} style={{
+            width: 110, height: 110, objectFit: 'cover', flexShrink: 0
+          }} />
+        ) : (
+          <div style={{
+            width: 110, height: 110, flexShrink: 0,
+            background: '#2a2a2a',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 36,
+          }}>🍽️</div>
+        )}
+      </div>
+
+      {!producto.disponible && (
+        <div style={{ background: '#2a0000', textAlign: 'center', padding: '5px', fontSize: 11, color: '#ef4444', fontWeight: 600 }}>
+          ⚠️ No disponible
         </div>
       )}
     </div>
