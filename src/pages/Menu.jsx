@@ -202,6 +202,34 @@ export default function Menu() {
         )}
       </div>
 
+
+      {/* ── FOOTER VALMAI ── */}
+      {!cantidad && (
+        <div style={{ textAlign: 'center', padding: '32px 20px 40px', borderTop: '1px solid #222' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 11, color: '#444', letterSpacing: 1 }}>SISTEMA DE PEDIDOS DIGITAL</p>
+          <a href="https://nimble-strudel-515f0a.netlify.app" target="_blank" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+            <svg width="32" height="32" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="200" cy="200" r="200" fill="#1e1e1e"/>
+              <circle cx="200" cy="200" r="180" fill="#1a1a2e"/>
+              <rect x="148" y="143" width="10" height="80" rx="5" fill="white"/>
+              <rect x="136" y="143" width="7" height="32" rx="3.5" fill="white"/>
+              <rect x="162" y="143" width="7" height="32" rx="3.5" fill="white"/>
+              <rect x="197" y="135" width="5" height="96" rx="2.5" fill="#b91c1c"/>
+              <rect x="212" y="143" width="22" height="22" rx="4" fill="white"/>
+              <rect x="240" y="143" width="22" height="22" rx="4" fill="white"/>
+              <rect x="212" y="171" width="22" height="22" rx="4" fill="white"/>
+              <rect x="240" y="171" width="10" height="10" rx="2" fill="#b91c1c"/>
+              <rect x="252" y="171" width="10" height="10" rx="2" fill="white"/>
+              <rect x="240" y="183" width="22" height="10" rx="2" fill="white"/>
+              <rect x="212" y="199" width="50" height="10" rx="2" fill="white"/>
+            </svg>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'white', letterSpacing: -0.3 }}>Valmai</p>
+              <p style={{ margin: 0, fontSize: 11, color: '#555' }}>Menú Digital QR · Paraguay</p>
+            </div>
+          </a>
+        </div>
+      )}
       {/* ── FAB CARRITO ── */}
       {cantidad > 0 && (
         <div style={{

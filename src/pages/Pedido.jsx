@@ -207,6 +207,31 @@ export default function Pedido() {
 
       </div>
 
+
+        {/* ── FOOTER VALMAI ── */}
+        <div style={{ textAlign: 'center', padding: '24px 0 8px', borderTop: '1px solid #222', marginTop: 8 }}>
+          <a href="https://nimble-strudel-515f0a.netlify.app" target="_blank" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <svg width="26" height="26" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="200" cy="200" r="200" fill="#1a1a2e"/>
+              <rect x="148" y="143" width="10" height="80" rx="5" fill="white"/>
+              <rect x="136" y="143" width="7" height="32" rx="3.5" fill="white"/>
+              <rect x="162" y="143" width="7" height="32" rx="3.5" fill="white"/>
+              <rect x="197" y="135" width="5" height="96" rx="2.5" fill="#b91c1c"/>
+              <rect x="212" y="143" width="22" height="22" rx="4" fill="white"/>
+              <rect x="240" y="143" width="22" height="22" rx="4" fill="white"/>
+              <rect x="212" y="171" width="22" height="22" rx="4" fill="white"/>
+              <rect x="240" y="171" width="10" height="10" rx="2" fill="#b91c1c"/>
+              <rect x="252" y="171" width="10" height="10" rx="2" fill="white"/>
+              <rect x="240" y="183" width="22" height="10" rx="2" fill="white"/>
+              <rect x="212" y="199" width="50" height="10" rx="2" fill="white"/>
+            </svg>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'white' }}>Hecho con Valmai</p>
+              <p style={{ margin: 0, fontSize: 10, color: '#444' }}>Menú Digital QR · Paraguay</p>
+            </div>
+          </a>
+        </div>
+
       {/* ── BOTÓN CONFIRMAR ── */}
       <div style={{
         position: 'fixed', bottom: 0, left: '50%',
