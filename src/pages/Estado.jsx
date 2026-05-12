@@ -232,6 +232,9 @@ export default function Estado() {
       setPedidos(data)
       const todosEntregados = data.length > 0 && data.every(p => p.estado === 'entregado')
       if (todosEntregados) {
+        localStorage.removeItem('pedidoActivo')
+      }
+      if (todosEntregados) {
         const maxSegs = Math.max(...data.map(p => p.segundos_desde_entrega || 0))
         const restante = Math.max(0, SEGUNDOS_LIMPIEZA - maxSegs)
         setCountdown(c => c === null ? restante : c)

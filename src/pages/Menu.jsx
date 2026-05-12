@@ -17,6 +17,24 @@ export default function Menu() {
   const [cargando, setCargando] = useState(true)
   const [categoriaActiva, setCategoriaActiva] = useState(null)
   const [busqueda, setBusqueda] = useState('')
+  const [pedidoActivo, setPedidoActivo] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pedidoActivo')) } catch { return null }
+  })
+
+  // Verificar si el pedido activo sigue vigente
+  useEffect(() => {
+    if (!pedidoActivo) return
+    const verificar = async () => {
+      try {
+        const res = await axios.get(`${API}/pedidos/${pedidoActivo.pedidoId}/estado`)
+        if (['entregado', 'cancelado'].includes(res.data.estado)) {
+          localStorage.removeItem('pedidoActivo')
+          setPedidoActivo(null)
+        }
+      } catch { }
+    }
+    verificar()
+  }, [])
 
   useEffect(() => {
     const cargar = async () => {
@@ -78,6 +96,7 @@ export default function Menu() {
       background: '#111111', fontFamily: "'Segoe UI', system-ui, sans-serif",
       color: 'white'
     }}>
+      <style>{`@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(1.4)}}`}</style>
 
       {/* ── HERO ── */}
       <div style={{ position: 'relative', height: 260, overflow: 'hidden' }}>
@@ -134,6 +153,31 @@ export default function Menu() {
           />
         </div>
       </div>
+
+      {/* ── BANNER PEDIDO ACTIVO ── */}
+      {pedidoActivo && pedidoActivo.slug === slug && (
+        <div
+          onClick={() => navigate(`/${slug}/estado/${pedidoActivo.pedidoId}?mesa=${pedidoActivo.mesa || ''}`)}
+          style={{
+            margin: '10px 14px 0',
+            background: 'linear-gradient(135deg, #b91c1c, #7f1d1d)',
+            borderRadius: 14, padding: '12px 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            cursor: 'pointer', gap: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', flexShrink: 0, animation: 'pulse 1.5s infinite' }} />
+            <div>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: 'white' }}>Tenés un pedido en curso</p>
+              <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+                {pedidoActivo.mesa ? `Mesa ${pedidoActivo.mesa}` : ''} · Tocá para ver el estado
+              </p>
+            </div>
+          </div>
+          <span style={{ color: 'white', fontSize: 18 }}>→</span>
+        </div>
+      )}
 
       {/* ── CATEGORÍAS ── */}
       {!busqueda && (

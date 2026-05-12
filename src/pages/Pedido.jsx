@@ -44,6 +44,12 @@ export default function Pedido() {
           nota: i.nota || null
         }))
       })
+      // Guardar pedido activo en localStorage para el banner
+      localStorage.setItem('pedidoActivo', JSON.stringify({
+        pedidoId: res.data.pedido_id,
+        mesa: mesa || null,
+        slug: slug,
+      }))
       limpiar()
       navigate(`/${slug}/estado/${res.data.pedido_id}?mesa=${mesa || ''}`)
     } catch (e) {
