@@ -27,7 +27,7 @@ export default function Menu() {
     const verificar = async () => {
       try {
         const res = await axios.get(`${API}/pedidos/${pedidoActivo.pedidoId}/estado`)
-        if (['entregado', 'cancelado'].includes(res.data.estado)) {
+        if (['entregado', 'cancelado', 'listo'].includes(res.data.estado)) {
           localStorage.removeItem('pedidoActivo')
           setPedidoActivo(null)
         }
