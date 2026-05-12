@@ -249,7 +249,7 @@ export default function Estado() {
   const cancelarPedido = async (id) => {
     if (!window.confirm('¿Cancelar este pedido?')) return
     try {
-      await axios.patch(`${API}/pedidos/${id}/cancelar`)
+      await axios.patch(`${API}/pedidos/${id}/cancelar-cliente`)
       localStorage.removeItem('pedidoActivo')
       cargarPedidos()
     } catch (e) {
