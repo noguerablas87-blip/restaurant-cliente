@@ -246,6 +246,17 @@ export default function Estado() {
     finally { setCargando(false) }
   }
 
+  const cancelarPedido = async (id) => {
+    if (!window.confirm('¿Cancelar este pedido?')) return
+    try {
+      await axios.patch(`${API}/pedidos/${id}/cancelar`)
+      localStorage.removeItem('pedidoActivo')
+      cargarPedidos()
+    } catch (e) {
+      alert('No se pudo cancelar el pedido.')
+    }
+  }
+
   useEffect(() => {
     cargarPedidos()
     const interval = setInterval(cargarPedidos, 15000)
@@ -363,11 +374,22 @@ export default function Estado() {
 
               {/* Pendiente */}
               {p.estado === 'pendiente' && (
-                <div style={{ padding: '0 16px 14px' }}>
-                  <div style={{ background: '#fff8e1', borderRadius: 12, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ background: 'rgba(230,126,34,0.1)', borderRadius: 12, padding: '10px 14px', textAlign: 'center', border: '1px solid rgba(230,126,34,0.2)' }}>
                     <p style={{ margin: 0, fontSize: 12, color: '#e67e22' }}>Esperando confirmación del local...</p>
                     {p.tiempo_estimado && <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 700, color: '#e67e22' }}>~{p.tiempo_estimado} min estimado</p>}
                   </div>
+                  <button
+                    onClick={() => cancelarPedido(p.id || p.pedido_id)}
+                    style={{
+                      width: '100%', background: 'transparent',
+                      border: '1.5px solid #444', borderRadius: 12,
+                      padding: '10px', fontSize: 13, fontWeight: 600,
+                      color: '#888', cursor: 'pointer', fontFamily: 'inherit'
+                    }}
+                  >
+                    ✕ Cancelar pedido
+                  </button>
                 </div>
               )}
 
