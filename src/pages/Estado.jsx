@@ -341,7 +341,7 @@ export default function Estado() {
                 {p.estado === 'entregado' && <AnimacionEntregado />}
                 {p.estado === 'cancelado' && <div style={{ fontSize: 52, lineHeight: 1 }}>❌</div>}
                 <p style={{ margin: '8px 0 0', fontWeight: 800, fontSize: 18, color: estadoColor }}>{estadoLabel}</p>
-                <p style={{ margin: 0, fontSize: 11, color: '#666' }}>Pedido #{p.id || p.pedido_id}</p>
+                <p style={{ margin: 0, fontSize: 11, color: '#666' }}>Pedido #{p.numero_diario || p.id || p.pedido_id}</p>
               </div>
 
               {/* Cabecera total */}
