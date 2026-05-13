@@ -4,7 +4,7 @@ import axios from 'axios'
 import { useCarrito } from '../context/CarritoContext'
 
 const API = 'https://restaurant-backend-production-1271.up.railway.app'
-const SEGUNDOS_LIMPIEZA = 10
+const SEGUNDOS_LIMPIEZA = 120
 
 // ── Animaciones SVG ──────────────────────────────────────────────────────────
 
@@ -234,8 +234,7 @@ export default function Estado() {
       if (todosEntregados) {
         localStorage.removeItem('pedidoActivo')
       }
-      const hayPendientes = data.some(p => ['pendiente', 'aceptado'].includes(p.estado))
-      if (todosEntregados && !hayPendientes) {
+      if (todosEntregados) {
         const maxSegs = Math.max(...data.map(p => p.segundos_desde_entrega || 0))
         const restante = Math.max(0, SEGUNDOS_LIMPIEZA - maxSegs)
         setCountdown(c => c === null ? restante : c)
