@@ -217,7 +217,14 @@ export default function Estado() {
     pedidosAntRef.current = pedidos
   }, [pedidos])
 
-  const color = local?.color_primario || '#b91c1c'
+  const [color, setColor] = useState('#b91c1c')
+useEffect(() => {
+  if (slug) {
+    axios.get(`https://restaurant-backend-production-1271.up.railway.app/locales/${slug}`)
+      .then(r => setColor(r.data.color_primario || '#b91c1c'))
+      .catch(() => {})
+  }
+}, [slug])
 
   const cargarPedidos = async () => {
     try {
