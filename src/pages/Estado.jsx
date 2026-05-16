@@ -498,7 +498,7 @@ useEffect(() => {
         )}
       </div>
 
-      {hayActivos && (mesa || pedidos.some(p => ['delivery','retiro'].includes(p.tipo))) && (
+      {(mesa ? hayActivos : pedidos.some(p => ['delivery','retiro'].includes(p.tipo) && p.estado === 'pendiente')) && (
         <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '10px 14px 16px', background: '#1e1e1e', borderTop: '1px solid #f0f0f0', zIndex: 100 }}>
           <button onClick={() => {
   const p = pedidos[0]
