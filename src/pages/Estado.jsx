@@ -379,7 +379,7 @@ useEffect(() => {
       <div style={{ background: color, padding: '22px 16px 28px', textAlign: 'center' }}>
         <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700 }}>Seguimiento del pedido</h2>
         <p style={{ color: 'rgba(255,255,255,0.78)', margin: '4px 0 0', fontSize: 13 }}>
-          {mesa ? `Mesa ${mesa}` : `Pedido #${pedidoId}`}
+          {mesa ? `Mesa ${mesa}` : `Pedido #${pedidos[0]?.numero_diario || pedidoId}`}
         </p>
       </div>
 
