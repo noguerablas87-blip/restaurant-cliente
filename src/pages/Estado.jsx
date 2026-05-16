@@ -139,6 +139,53 @@ function AnimacionEntregado() {
 }
 
 
+function AnimacionMoto() {
+  return (
+    <div style={{ width: 140, height: 100, margin: '0 auto' }}>
+      <style>{`
+        @keyframes moto-move { 0%,100%{transform:translateX(0)} 50%{transform:translateX(5px)} }
+        @keyframes rueda { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+        @keyframes casco-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+        .moto{animation:moto-move 0.4s ease-in-out infinite}
+        .rd{animation:rueda 0.4s linear infinite}
+        .cb{animation:casco-bob 0.4s ease-in-out infinite}
+      `}</style>
+      <svg width="100%" viewBox="0 0 100 70">
+        <g className="moto">
+          <g className="rd" style={{transformOrigin:'22px 52px'}}>
+            <circle cx="22" cy="52" r="12" fill="none" stroke="#555" strokeWidth="4"/>
+            <circle cx="22" cy="52" r="4" fill="#666"/>
+            <line x1="22" y1="40" x2="22" y2="64" stroke="#444" strokeWidth="1.5"/>
+            <line x1="10" y1="52" x2="34" y2="52" stroke="#444" strokeWidth="1.5"/>
+          </g>
+          <g className="rd" style={{transformOrigin:'76px 52px'}}>
+            <circle cx="76" cy="52" r="12" fill="none" stroke="#555" strokeWidth="4"/>
+            <circle cx="76" cy="52" r="4" fill="#666"/>
+            <line x1="76" y1="40" x2="76" y2="64" stroke="#444" strokeWidth="1.5"/>
+            <line x1="64" y1="52" x2="88" y2="52" stroke="#444" strokeWidth="1.5"/>
+          </g>
+          <path d="M22 48 L35 35 L60 35 L76 48" fill="none" stroke="#b91c1c" strokeWidth="3" strokeLinecap="round"/>
+          <path d="M35 35 L45 28 L65 28 L70 35" fill="#b91c1c" stroke="#991b1b" strokeWidth="1"/>
+          <rect x="38" y="26" width="24" height="6" rx="3" fill="#222"/>
+          <line x1="68" y1="28" x2="78" y2="22" stroke="#555" strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1="78" y1="22" x2="82" y2="26" stroke="#555" strokeWidth="2" strokeLinecap="round"/>
+          <rect x="38" y="36" width="20" height="12" rx="3" fill="#333"/>
+          <path d="M22 46 L18 50 L10 50" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round"/>
+          <g className="cb">
+            <rect x="44" y="14" width="16" height="14" rx="4" fill="#b91c1c"/>
+            <ellipse cx="52" cy="10" rx="9" ry="8" fill="#1a1a2e"/>
+            <ellipse cx="52" cy="11" rx="6" ry="4" fill="#3b82f6" opacity="0.5"/>
+            <line x1="60" y1="18" x2="72" y2="23" stroke="#f5c89a" strokeWidth="3" strokeLinecap="round"/>
+          </g>
+          <line x1="0" y1="45" x2="8" y2="45" stroke="#b91c1c" strokeWidth="1.5" opacity="0.6"/>
+          <line x1="0" y1="50" x2="10" y2="50" stroke="#b91c1c" strokeWidth="1" opacity="0.4"/>
+          <line x1="0" y1="55" x2="6" y2="55" stroke="#b91c1c" strokeWidth="1" opacity="0.3"/>
+        </g>
+      </svg>
+    </div>
+  )
+}
+
 // ── Sonido listo Web Audio API ────────────────────────────────────────────────
 function sonarPedidoListo() {
   try {
@@ -349,7 +396,8 @@ useEffect(() => {
               <div style={{ padding: '20px 16px 8px', textAlign: 'center' }}>
                 {p.estado === 'pendiente' && <AnimacionRecibido color={color} />}
                 {p.estado === 'aceptado' && <AnimacionPreparando />}
-                {p.estado === 'listo' && <AnimacionListo />}
+                {p.estado === 'listo' && p.tipo === 'delivery' && <AnimacionMoto />}
+{p.estado === 'listo' && p.tipo !== 'delivery' && <AnimacionListo />}
                 {p.estado === 'entregado' && <AnimacionEntregado />}
                 {p.estado === 'cancelado' && <div style={{ fontSize: 52, lineHeight: 1 }}>❌</div>}
                 <p style={{ margin: '8px 0 0', fontWeight: 800, fontSize: 18, color: estadoColor }}>{estadoLabel}</p>
@@ -411,7 +459,9 @@ useEffect(() => {
                 <div style={{ padding: '0 16px 14px' }}>
                   <div style={{ background: '#f0fff4', borderRadius: 12, padding: '10px 14px', textAlign: 'center' }}>
                     <p style={{ margin: 0, color: '#27ae60', fontWeight: 700, fontSize: 14 }}>¡Tu pedido está listo! 🎉</p>
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#888' }}>El mozo te lo llevará en un momento</p>
+                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#888' }}>
+  {p.tipo === 'delivery' ? '🛵 Tu pedido está en camino' : p.tipo === 'retiro' ? '🏪 Pasá a buscarlo al local' : 'El mozo te lo llevará en un momento'}
+</p>
                   </div>
                 </div>
               )}
@@ -448,9 +498,14 @@ useEffect(() => {
         )}
       </div>
 
-      {hayActivos && mesa && (
+      {hayActivos && (mesa || pedidos.some(p => ['delivery','retiro'].includes(p.tipo))) && (
         <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '10px 14px 16px', background: '#1e1e1e', borderTop: '1px solid #f0f0f0', zIndex: 100 }}>
-          <button onClick={() => navigate(`/${slug}?mesa=${mesa}`)} style={{ width: '100%', background: color, color: 'white', border: 'none', borderRadius: 14, padding: '15px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={() => {
+  const p = pedidos[0]
+  if (p?.tipo === 'delivery') navigate(`/${slug}?tipo=delivery`)
+  else if (p?.tipo === 'retiro') navigate(`/${slug}?tipo=retiro`)
+  else navigate(`/${slug}?mesa=${mesa}`)
+}}style={{ width: '100%', background: color, color: 'white', border: 'none', borderRadius: 14, padding: '15px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
             + Agregar más items al pedido
           </button>
         </div>
