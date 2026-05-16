@@ -236,9 +236,14 @@ export default function Estado() {
       }
     const hayPendientes = data.some(p => ['pendiente', 'aceptado'].includes(p.estado))
       if (todosEntregados && !hayPendientes) {
-        const maxSegs = Math.max(...data.map(p => p.segundos_desde_entrega || 0))
-        const restante = Math.max(0, SEGUNDOS_LIMPIEZA - maxSegs)
-        setCountdown(c => c === null ? restante : c)
+  const maxSegs = Math.max(...data.map(p => p.segundos_desde_entrega || 0))
+  const restante = Math.max(0, SEGUNDOS_LIMPIEZA - maxSegs)
+  if (restante === 0) {
+    localStorage.removeItem('pedidoActivo')
+    navigate(`/${slug}?mesa=${mesa}`)
+    return
+  }
+  setCountdown(c => c === null ? restante : c)
       } else {
         setCountdown(null)
         if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null }
