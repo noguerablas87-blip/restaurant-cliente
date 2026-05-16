@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useCarrito } from '../context/CarritoContext'
 
 const API = 'https://restaurant-backend-production-1271.up.railway.app'
+const GOOGLE_API_KEY = 'AIzaSyA62BdP0S_uQJauHy-q9CeZmYEm-XA_SyQ'
 
 const METODOS_PAGO = [
   { id: 'efectivo',  icon: '💵', label: 'Efectivo',          sub: 'Al recibir el pedido' },
@@ -26,16 +27,137 @@ export default function Pedido() {
   const [metodoPago, setMetodoPago] = useState('efectivo')
   const [enviando, setEnviando] = useState(false)
 
+  // Delivery con mapa
+  const mapRef = useRef(null)
+  const markerRef = useRef(null)
+  const mapInstanceRef = useRef(null)
+  const [mapListo, setMapListo] = useState(false)
+  const [distanciaKm, setDistanciaKm] = useState(null)
+  const [costoDelivery, setCostoDelivery] = useState(0)
+  const [clienteLat, setClienteLat] = useState(null)
+  const [clienteLng, setClienteLng] = useState(null)
+  const [calculando, setCalculando] = useState(false)
+
   const color = local?.color_primario || '#b91c1c'
   const totalLocal = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0)
-
   const esDelivery = tipo === 'delivery'
   const esRetiro = tipo === 'retiro'
+
+  // Cargar Google Maps solo para delivery
+  useEffect(() => {
+    if (!esDelivery) return
+    if (window.google) { setMapListo(true); return }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=places`
+    script.async = true
+    script.onload = () => setMapListo(true)
+    document.head.appendChild(script)
+  }, [esDelivery])
+
+  // Inicializar mapa
+  useEffect(() => {
+    if (!mapListo || !mapRef.current || !esDelivery) return
+    const google = window.google
+    const defaultLat = local?.latitud || -25.2867
+    const defaultLng = local?.longitud || -57.647
+
+    const map = new google.maps.Map(mapRef.current, {
+      center: { lat: defaultLat, lng: defaultLng },
+      zoom: 14,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    })
+    mapInstanceRef.current = map
+
+    // Marker del local (fijo)
+    new google.maps.Marker({
+      position: { lat: defaultLat, lng: defaultLng },
+      map,
+      title: 'Local',
+      icon: { url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' }
+    })
+
+    // Marker del cliente (movible)
+    const clienteMarker = new google.maps.Marker({
+      position: { lat: defaultLat, lng: defaultLng },
+      map,
+      draggable: true,
+      title: 'Tu ubicación',
+      icon: { url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png' }
+    })
+    markerRef.current = clienteMarker
+
+    const actualizarPosicion = async (lat, lng) => {
+      setClienteLat(lat)
+      setClienteLng(lng)
+      setCalculando(true)
+      try {
+        // Geocoding para dirección
+        const geoRes = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`)
+        const geoData = await geoRes.json()
+        if (geoData.results[0]) setDireccion(geoData.results[0].formatted_address)
+
+        // Distance Matrix para distancia real
+        if (local?.latitud && local?.longitud) {
+          const distRes = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${local.latitud},${local.longitud}&destinations=${lat},${lng}&key=${GOOGLE_API_KEY}`)
+          const distData = await distRes.json()
+          const elemento = distData.rows?.[0]?.elements?.[0]
+          if (elemento?.status === 'OK') {
+            const km = elemento.distance.value / 1000
+            setDistanciaKm(km.toFixed(1))
+            const costo = Math.ceil(km) * (local?.costo_km || 0)
+            setCostoDelivery(costo)
+          }
+        }
+      } catch (e) {}
+      finally { setCalculando(false) }
+    }
+
+    clienteMarker.addListener('dragend', (e) => {
+      actualizarPosicion(e.latLng.lat(), e.latLng.lng())
+    })
+
+    map.addListener('click', (e) => {
+      clienteMarker.setPosition(e.latLng)
+      actualizarPosicion(e.latLng.lat(), e.latLng.lng())
+    })
+  }, [mapListo, local])
+
+  const usarMiUbicacion = () => {
+    if (!navigator.geolocation) { alert('Tu dispositivo no soporta geolocalización'); return }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const lat = pos.coords.latitude
+      const lng = pos.coords.longitude
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setCenter({ lat, lng })
+        markerRef.current?.setPosition({ lat, lng })
+        markerRef.current?.map && markerRef.current.map.setZoom(16)
+      }
+      setClienteLat(lat)
+      setClienteLng(lng)
+      setCalculando(true)
+      Promise.all([
+        fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`).then(r => r.json()),
+        local?.latitud && local?.longitud
+          ? fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${local.latitud},${local.longitud}&destinations=${lat},${lng}&key=${GOOGLE_API_KEY}`).then(r => r.json())
+          : Promise.resolve(null)
+      ]).then(([geoData, distData]) => {
+        if (geoData.results[0]) setDireccion(geoData.results[0].formatted_address)
+        const elemento = distData?.rows?.[0]?.elements?.[0]
+        if (elemento?.status === 'OK') {
+          const km = elemento.distance.value / 1000
+          setDistanciaKm(km.toFixed(1))
+          setCostoDelivery(Math.ceil(km) * (local?.costo_km || 0))
+        }
+      }).catch(() => {}).finally(() => setCalculando(false))
+    }, () => alert('No se pudo obtener tu ubicación'))
+  }
 
   const confirmar = async () => {
     if (items.length === 0) return
     if (esDelivery && !direccion.trim()) {
-      alert('Por favor ingresá tu dirección de entrega')
+      alert('Por favor seleccioná tu ubicación en el mapa')
       return
     }
     if (esDelivery && !telefono.trim()) {
@@ -53,6 +175,7 @@ export default function Pedido() {
         tipo: tipo,
         direccion_entrega: esDelivery ? direccion : null,
         telefono_cliente: (esDelivery || esRetiro) ? telefono : null,
+        costo_delivery: esDelivery ? costoDelivery : 0,
         items: items.map(i => ({
           producto_id: i.id,
           cantidad: i.cantidad,
@@ -82,11 +205,12 @@ export default function Pedido() {
   }
 
   const tipoLabel = esDelivery ? '🛵 Delivery' : esRetiro ? '🏪 Para retirar' : mesa ? `🪑 Mesa ${mesa}` : ''
+  const totalConDelivery = totalLocal + costoDelivery
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', minHeight: '100vh', background: '#111111', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
-      {/* ── HEADER ── */}
+      {/* HEADER */}
       <div style={{ background: color, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: 34, height: 34, color: 'white', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>←</button>
         <h2 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700, flex: 1 }}>Tu pedido</h2>
@@ -95,7 +219,7 @@ export default function Pedido() {
 
       <div style={{ padding: '14px 14px 120px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-        {/* ── ITEMS ── */}
+        {/* ITEMS */}
         <div style={{ background: '#1e1e1e', borderRadius: 16, overflow: 'hidden', border: '1px solid #2a2a2a' }}>
           {items.map((item, idx) => (
             <div key={item.id} style={{ padding: '12px 14px', borderBottom: idx < items.length - 1 ? '1px solid #222' : 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -112,23 +236,65 @@ export default function Pedido() {
             </div>
           ))}
           <div style={{ padding: '13px 14px', borderTop: '1.5px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span style={{ fontWeight: 600, fontSize: 14, color: '#aaa' }}>Total</span>
+            <span style={{ fontWeight: 600, fontSize: 14, color: '#aaa' }}>Subtotal</span>
             <span style={{ fontWeight: 800, fontSize: 22, color: color }}>Gs. {totalLocal.toLocaleString()}</span>
           </div>
+          {esDelivery && costoDelivery > 0 && (
+            <div style={{ padding: '8px 14px 13px', borderTop: '1px solid #222' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 13, color: '#666' }}>🛵 Delivery ({distanciaKm} km)</span>
+                <span style={{ fontSize: 13, color: '#f59e0b' }}>Gs. {costoDelivery.toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: 15, color: 'white' }}>Total</span>
+                <span style={{ fontWeight: 800, fontSize: 18, color: '#22c55e' }}>Gs. {totalConDelivery.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ── DELIVERY — dirección y teléfono ── */}
+        {/* DELIVERY — mapa */}
         {esDelivery && (
           <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: `1px solid ${color}44` }}>
-            <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: color, letterSpacing: 1, textTransform: 'uppercase' }}>
-              🛵 Datos de entrega
+            <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 13, color: color, letterSpacing: 1, textTransform: 'uppercase' }}>
+              🛵 Tu ubicación de entrega
             </p>
-            <input
-              placeholder="Dirección de entrega *"
-              value={direccion}
-              onChange={e => setDireccion(e.target.value)}
-              style={{ ...inputStyle, marginBottom: 8 }}
-            />
+
+            <button onClick={usarMiUbicacion} style={{
+              width: '100%', background: '#1e3a5f', color: 'white', border: 'none',
+              borderRadius: 10, padding: '11px', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', marginBottom: 10
+            }}>
+              🎯 Usar mi ubicación actual
+            </button>
+
+            <p style={{ margin: '0 0 8px', fontSize: 12, color: '#555' }}>O tocá en el mapa para marcar tu ubicación:</p>
+
+            <div ref={mapRef} style={{ height: 260, borderRadius: 12, overflow: 'hidden', border: '1px solid #333', marginBottom: 10 }} />
+
+            {calculando && (
+              <div style={{ textAlign: 'center', fontSize: 12, color: '#888', marginBottom: 8 }}>Calculando distancia...</div>
+            )}
+
+            {distanciaKm && !calculando && (
+              <div style={{ background: '#111', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, color: '#aaa' }}>📍 Distancia al local</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>{distanciaKm} km</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: '#aaa' }}>🛵 Costo de delivery</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#f59e0b' }}>Gs. {costoDelivery.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
+
+            {direccion && (
+              <div style={{ background: '#111', borderRadius: 10, padding: '8px 12px', marginBottom: 8, fontSize: 12, color: '#aaa' }}>
+                📍 {direccion}
+              </div>
+            )}
+
             <input
               placeholder="Teléfono de contacto *"
               value={telefono}
@@ -139,38 +305,32 @@ export default function Pedido() {
           </div>
         )}
 
-        {/* ── RETIRO — teléfono ── */}
+        {/* RETIRO */}
         {esRetiro && (
           <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #2a2a2a' }}>
             <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#22c55e', letterSpacing: 1, textTransform: 'uppercase' }}>
               🏪 Datos de retiro
             </p>
-            <input
-              placeholder="Teléfono de contacto (opcional)"
-              value={telefono}
-              onChange={e => setTelefono(e.target.value)}
-              type="tel"
-              style={inputStyle}
-            />
+            <input placeholder="Teléfono de contacto (opcional)" value={telefono} onChange={e => setTelefono(e.target.value)} type="tel" style={inputStyle} />
           </div>
         )}
 
-        {/* ── DATOS OPCIONALES ── */}
+        {/* DATOS OPCIONALES */}
         <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #2a2a2a' }}>
           <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#666', letterSpacing: 1, textTransform: 'uppercase' }}>Datos opcionales</p>
           <input placeholder="Tu nombre (opcional)" value={nombre} onChange={e => setNombre(e.target.value)} style={{ ...inputStyle, marginBottom: 8 }} />
-          <textarea placeholder="Nota para la cocina — ej: sin cebolla, bien cocido..." value={nota} onChange={e => setNota(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'none' }} />
+          <textarea placeholder="Nota para la cocina..." value={nota} onChange={e => setNota(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'none' }} />
         </div>
 
-        {/* ── MÉTODO DE PAGO ── */}
+        {/* MÉTODO DE PAGO */}
         <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #2a2a2a' }}>
           <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#666', letterSpacing: 1, textTransform: 'uppercase' }}>Método de pago</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {METODOS_PAGO.map(m => {
               const sel = metodoPago === m.id
               return (
-                <div key={m.id} onClick={() => setMetodoPago(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', border: sel ? `2px solid ${color}` : '1.5px solid #333', background: sel ? `${color}11` : '#1a1a1a', transition: 'all 0.15s ease' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: sel ? `5px solid ${color}` : '2px solid #555', background: sel ? color : 'transparent', transition: 'all 0.15s ease' }} />
+                <div key={m.id} onClick={() => setMetodoPago(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', border: sel ? `2px solid ${color}` : '1.5px solid #333', background: sel ? `${color}11` : '#1a1a1a' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: sel ? `5px solid ${color}` : '2px solid #555', background: sel ? color : 'transparent' }} />
                   <span style={{ fontSize: 20, flexShrink: 0 }}>{m.icon}</span>
                   <div>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'white' }}>{m.label}</p>
@@ -182,7 +342,7 @@ export default function Pedido() {
           </div>
         </div>
 
-        {/* ── FOOTER VALMAI ── */}
+        {/* FOOTER VALMAI */}
         <div style={{ textAlign: 'center', padding: '24px 0 8px', borderTop: '1px solid #222', marginTop: 8 }}>
           <a href="https://nimble-strudel-515f0a.netlify.app" target="_blank" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <svg width="26" height="26" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
@@ -205,17 +365,16 @@ export default function Pedido() {
             </div>
           </a>
         </div>
-
       </div>
 
-      {/* ── BOTÓN CONFIRMAR ── */}
+      {/* BOTÓN CONFIRMAR */}
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '10px 14px 16px', background: '#1e1e1e', borderTop: '1px solid #222', zIndex: 100 }}>
         <button onClick={confirmar} disabled={enviando || items.length === 0} style={{
           width: '100%', background: (enviando || items.length === 0) ? '#333' : color,
           color: 'white', border: 'none', borderRadius: 14, padding: '15px 16px', fontSize: 15, fontWeight: 700,
           cursor: (enviando || items.length === 0) ? 'not-allowed' : 'pointer',
         }}>
-          {enviando ? 'Enviando pedido...' : `Confirmar pedido — Gs. ${totalLocal.toLocaleString()}`}
+          {enviando ? 'Enviando pedido...' : `Confirmar pedido — Gs. ${totalConDelivery.toLocaleString()}`}
         </button>
       </div>
     </div>
