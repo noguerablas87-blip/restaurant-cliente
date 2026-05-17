@@ -11,7 +11,15 @@ const METODOS_PAGO = [
   { id: 'billetera', icon: '📱', label: 'Billetera digital', sub: 'Tigo Money / Personal Pay' },
   { id: 'tarjeta',   icon: '💳', label: 'Tarjeta',           sub: 'Débito o crédito' },
 ]
-
+function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
 export default function Pedido() {
   const { slug } = useParams()
   const [searchParams] = useSearchParams()
@@ -98,17 +106,11 @@ export default function Pedido() {
         const geoData = await geoRes.json()
         if (geoData.results[0]) setDireccion(geoData.results[0].formatted_address)
 
-        // Distance Matrix para distancia real
+        // Haversine para distancia
         if (local?.latitud && local?.longitud) {
-          const distRes = await fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${local.latitud},${local.longitud}&destinations=${lat},${lng}&key=${GOOGLE_API_KEY}`)
-          const distData = await distRes.json()
-          const elemento = distData.rows?.[0]?.elements?.[0]
-          if (elemento?.status === 'OK') {
-            const km = elemento.distance.value / 1000
-            setDistanciaKm(km.toFixed(1))
-            const costo = Math.ceil(km) * (local?.costo_km || 0)
-            setCostoDelivery(costo)
-          }
+          const km = calcularDistanciaKm(local.latitud, local.longitud, lat, lng)
+          setDistanciaKm(km.toFixed(1))
+          setCostoDelivery(Math.ceil(km) * (local?.costo_km || 0))
         }
       } catch (e) {}
       finally { setCalculando(false) }
@@ -137,20 +139,16 @@ export default function Pedido() {
       setClienteLat(lat)
       setClienteLng(lng)
       setCalculando(true)
-      Promise.all([
-        fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`).then(r => r.json()),
-        local?.latitud && local?.longitud
-          ? fetch(`https://maps.googleapis.com/maps/api/distancematrix/json?origins=${local.latitud},${local.longitud}&destinations=${lat},${lng}&key=${GOOGLE_API_KEY}`).then(r => r.json())
-          : Promise.resolve(null)
-      ]).then(([geoData, distData]) => {
-        if (geoData.results[0]) setDireccion(geoData.results[0].formatted_address)
-        const elemento = distData?.rows?.[0]?.elements?.[0]
-        if (elemento?.status === 'OK') {
-          const km = elemento.distance.value / 1000
-          setDistanciaKm(km.toFixed(1))
-          setCostoDelivery(Math.ceil(km) * (local?.costo_km || 0))
-        }
-      }).catch(() => {}).finally(() => setCalculando(false))
+      fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`)
+        .then(r => r.json())
+        .then(geoData => {
+          if (geoData.results[0]) setDireccion(geoData.results[0].formatted_address)
+          if (local?.latitud && local?.longitud) {
+            const km = calcularDistanciaKm(local.latitud, local.longitud, lat, lng)
+            setDistanciaKm(km.toFixed(1))
+            setCostoDelivery(Math.ceil(km) * (local?.costo_km || 0))
+          }
+        }).catch(() => {}).finally(() => setCalculando(false))
     }, () => alert('No se pudo obtener tu ubicación'))
   }
 
