@@ -48,6 +48,9 @@ export default function Pedido() {
   const [direccion, setDireccion] = useState('')
   const [metodoPago, setMetodoPago] = useState('efectivo')
   const [enviando, setEnviando] = useState(false)
+  const [necesitaFactura, setNecesitaFactura] = useState(false)
+  const [facturaRuc, setFacturaRuc] = useState('')
+  const [facturaRazonSocial, setFacturaRazonSocial] = useState('')
 
   // Delivery con mapa
   const mapRef = useRef(null)
@@ -218,6 +221,9 @@ useEffect(() => {
         direccion_entrega: esDelivery ? direccion : null,
         telefono_cliente: (esDelivery || esRetiro) ? telefono : null,
         costo_delivery: esDelivery ? costoDelivery : 0,
+        necesita_factura: necesitaFactura,
+        factura_ruc: necesitaFactura ? facturaRuc : null,
+        factura_razon_social: necesitaFactura ? facturaRazonSocial : null,
         items: items.map(i => ({
           producto_id: i.id,
           cantidad: i.cantidad,
@@ -368,6 +374,41 @@ useEffect(() => {
           <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#666', letterSpacing: 1, textTransform: 'uppercase' }}>Datos opcionales</p>
           <input placeholder="Tu nombre (opcional)" value={nombre} onChange={e => setNombre(e.target.value)} style={{ ...inputStyle, marginBottom: 8 }} />
           <textarea placeholder="Nota para la cocina..." value={nota} onChange={e => setNota(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'none' }} />
+        </div>
+
+       {/* FACTURA */}
+        <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #2a2a2a' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: 'white' }}>🧾 ¿Necesitás factura?</p>
+            <div onClick={() => setNecesitaFactura(!necesitaFactura)} style={{
+              width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+              background: necesitaFactura ? '#22c55e' : '#333',
+              position: 'relative', transition: 'background 0.2s'
+            }}>
+              <div style={{
+                width: 18, height: 18, borderRadius: '50%', background: 'white',
+                position: 'absolute', top: 3,
+                left: necesitaFactura ? 23 : 3,
+                transition: 'left 0.2s'
+              }} />
+            </div>
+          </div>
+          {necesitaFactura && (
+            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                placeholder="RUC o CI *"
+                value={facturaRuc}
+                onChange={e => setFacturaRuc(e.target.value)}
+                style={{ ...inputStyle }}
+              />
+              <input
+                placeholder="Razón social o nombre completo *"
+                value={facturaRazonSocial}
+                onChange={e => setFacturaRazonSocial(e.target.value)}
+                style={{ ...inputStyle }}
+              />
+            </div>
+          )}
         </div>
 
         {/* MÉTODO DE PAGO */}
