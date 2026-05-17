@@ -6,10 +6,14 @@ import { useCarrito } from '../context/CarritoContext'
 const API = 'https://restaurant-backend-production-1271.up.railway.app'
 const GOOGLE_API_KEY = 'AIzaSyA62BdP0S_uQJauHy-q9CeZmYEm-XA_SyQ'
 
-const METODOS_PAGO = [
-  { id: 'efectivo',  icon: '💵', label: 'Efectivo',          sub: 'Al recibir el pedido' },
-  { id: 'billetera', icon: '📱', label: 'Billetera digital', sub: 'Tigo Money / Personal Pay' },
-  { id: 'tarjeta',   icon: '💳', label: 'Tarjeta',           sub: 'Débito o crédito' },
+const METODOS_MESA = [
+  { id: 'efectivo',      icon: '💵', label: 'Efectivo',      sub: 'Al recibir el pedido' },
+  { id: 'tarjeta',       icon: '💳', label: 'Tarjeta',       sub: 'Débito o crédito' },
+  { id: 'transferencia', icon: '🏦', label: 'Transferencia', sub: 'Pago bancario' },
+]
+const METODOS_DELIVERY = [
+  { id: 'efectivo',      icon: '💵', label: 'Efectivo',      sub: 'Al recibir el pedido' },
+  { id: 'transferencia', icon: '🏦', label: 'Transferencia', sub: 'Pago bancario' },
 ]
 function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371
@@ -69,6 +73,7 @@ useEffect(() => {
   const totalLocal = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0)
   const esDelivery = tipo === 'delivery'
   const esRetiro = tipo === 'retiro'
+  const metodosPago = (esDelivery || esRetiro) ? METODOS_DELIVERY : METODOS_MESA
 
   // Cargar Google Maps solo para delivery
   useEffect(() => {
@@ -369,7 +374,7 @@ useEffect(() => {
         <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #2a2a2a' }}>
           <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#666', letterSpacing: 1, textTransform: 'uppercase' }}>Método de pago</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {METODOS_PAGO.map(m => {
+            {metodosPago.map(m => {
               const sel = metodoPago === m.id
               return (
                 <div key={m.id} onClick={() => setMetodoPago(m.id)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', border: sel ? `2px solid ${color}` : '1.5px solid #333', background: sel ? `${color}11` : '#1a1a1a' }}>
@@ -384,7 +389,21 @@ useEffect(() => {
             })}
           </div>
         </div>
+        {/* DATOS BANCARIOS — solo si elige transferencia */}
+        {metodoPago === 'transferencia' && localData?.banco && (
+          <div style={{ background: '#1e1e1e', borderRadius: 16, padding: '14px', border: '1px solid #22c55e44' }}>
+            <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 11, color: '#22c55e', letterSpacing: 1, textTransform: 'uppercase' }}>🏦 Datos para transferencia</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {localData.banco && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Banco</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localData.banco}</span></div>}
+              {localData.cuenta_bancaria && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Cuenta</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localData.cuenta_bancaria}</span></div>}
+              {localData.titular_cuenta && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Titular</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localData.titular_cuenta}</span></div>}
+              {localData.alias_cuenta && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Alias</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localData.alias_cuenta}</span></div>}
+            </div>
+            <p style={{ margin: '10px 0 0', fontSize: 12, color: '#555' }}>Realizá la transferencia y enviá el comprobante al local.</p>
+          </div>
+        )}
 
+        
         {/* FOOTER VALMAI */}
         <div style={{ textAlign: 'center', padding: '24px 0 8px', borderTop: '1px solid #222', marginTop: 8 }}>
           <a href="https://nimble-strudel-515f0a.netlify.app" target="_blank" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
