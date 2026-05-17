@@ -181,6 +181,10 @@ useEffect(() => {
 
   const confirmar = async () => {
     if (items.length === 0) return
+    if (esDelivery && fueraDeZona) {
+      alert('Tu ubicación está fuera de la zona de delivery de este local')
+      return
+    }
     if (esDelivery && !direccion.trim()) {
       alert('Por favor seleccioná tu ubicación en el mapa')
       return
