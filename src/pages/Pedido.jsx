@@ -55,6 +55,7 @@ export default function Pedido() {
   const [clienteLat, setClienteLat] = useState(null)
   const [clienteLng, setClienteLng] = useState(null)
   const [calculando, setCalculando] = useState(false)
+  const [fueraDeZona, setFueraDeZona] = useState(false)
 
   const [color, setColor] = useState('#b91c1c')
 useEffect(() => {
@@ -127,8 +128,16 @@ useEffect(() => {
         // Haversine para distancia
         if (localData?.latitud && localData?.longitud) {
           const km = calcularDistanciaKm(localData.latitud, localData.longitud, lat, lng)
-          setDistanciaKm(km.toFixed(1))
-          setCostoDelivery(Math.ceil(km) * (localData?.costo_km || 0))
+          const maxKm = localData?.distancia_max_km || 0
+          if (maxKm > 0 && km > maxKm) {
+            setDistanciaKm(km.toFixed(1))
+            setCostoDelivery(0)
+            setFueraDeZona(true)
+          } else {
+            setDistanciaKm(km.toFixed(1))
+            setCostoDelivery(Math.ceil(km) * (localData?.costo_km || 0))
+            setFueraDeZona(false)
+          }
         }
       } catch (e) {}
       finally { setCalculando(false) }
@@ -291,6 +300,12 @@ useEffect(() => {
             {calculando && (
               <div style={{ textAlign: 'center', fontSize: 12, color: '#888', marginBottom: 8 }}>Calculando distancia...</div>
             )}
+            {fueraDeZona && (
+              <div style={{ background: '#1a0000', borderRadius: 10, padding: '10px 12px', marginBottom: 8, border: '1px solid #330000' }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#ef4444' }}>⚠️ Fuera de zona de delivery</p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#888' }}>Este local solo hace delivery hasta {localData?.distancia_max_km} km. Tu ubicación está a {distanciaKm} km.</p>
+              </div>
+            )}
 
             {distanciaKm && !calculando && (
               <div style={{ background: '#111', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
@@ -385,7 +400,7 @@ useEffect(() => {
 
       {/* BOTÓN CONFIRMAR */}
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480, padding: '10px 14px 16px', background: '#1e1e1e', borderTop: '1px solid #222', zIndex: 100 }}>
-        <button onClick={confirmar} disabled={enviando || items.length === 0} style={{
+        <button onClick={confirmar} disabled={enviando || items.length === 0 || fueraDeZona} style={{
           width: '100%', background: (enviando || items.length === 0) ? '#333' : color,
           color: 'white', border: 'none', borderRadius: 14, padding: '15px 16px', fontSize: 15, fontWeight: 700,
           cursor: (enviando || items.length === 0) ? 'not-allowed' : 'pointer',
