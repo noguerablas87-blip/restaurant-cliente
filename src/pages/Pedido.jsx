@@ -170,10 +170,18 @@ useEffect(() => {
         .then(r => r.json())
         .then(geoData => {
           if (geoData.results[0]) setDireccion(geoData.results[0].formatted_address)
-          if (local?.latitud && local?.longitud) {
-            const km = calcularDistanciaKm(local.latitud, local.longitud, lat, lng)
-            setDistanciaKm(km.toFixed(1))
-            setCostoDelivery(Math.ceil(km) * (local?.costo_km || 0))
+          if (localData?.latitud && localData?.longitud) {
+            const km = calcularDistanciaKm(localData.latitud, localData.longitud, lat, lng)
+            const maxKm = localData?.distancia_max_km || 0
+            if (maxKm > 0 && km > maxKm) {
+              setDistanciaKm(km.toFixed(1))
+              setCostoDelivery(0)
+              setFueraDeZona(true)
+            } else {
+              setDistanciaKm(km.toFixed(1))
+              setCostoDelivery(Math.ceil(km) * (localData?.costo_km || 0))
+              setFueraDeZona(false)
+            }
           }
         }).catch(() => {}).finally(() => setCalculando(false))
     }, () => alert('No se pudo obtener tu ubicación'))
