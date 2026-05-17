@@ -46,7 +46,15 @@ export default function Pedido() {
   const [clienteLng, setClienteLng] = useState(null)
   const [calculando, setCalculando] = useState(false)
 
-  const color = local?.color_primario || '#b91c1c'
+  const [color, setColor] = useState('#b91c1c')
+useEffect(() => {
+  if (local?.color_primario) setColor(local.color_primario)
+  else if (slug) {
+    axios.get(`${API}/locales/${slug}`)
+      .then(r => setColor(r.data.color_primario || '#b91c1c'))
+      .catch(() => {})
+  }
+}, [local, slug])
   const totalLocal = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0)
   const esDelivery = tipo === 'delivery'
   const esRetiro = tipo === 'retiro'
