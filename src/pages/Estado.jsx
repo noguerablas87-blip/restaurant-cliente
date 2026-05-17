@@ -265,13 +265,14 @@ export default function Estado() {
   }, [pedidos])
 
   const [color, setColor] = useState('#b91c1c')
-useEffect(() => {
-  if (slug) {
-    axios.get(`https://restaurant-backend-production-1271.up.railway.app/locales/${slug}`)
-      .then(r => setColor(r.data.color_primario || '#b91c1c'))
-      .catch(() => {})
-  }
-}, [slug])
+  const [localInfo, setLocalInfo] = useState(null)
+  useEffect(() => {
+    if (slug) {
+      axios.get(`https://restaurant-backend-production-1271.up.railway.app/locales/${slug}`)
+        .then(r => { setColor(r.data.color_primario || '#b91c1c'); setLocalInfo(r.data) })
+        .catch(() => {})
+    }
+  }, [slug])
 
   const cargarPedidos = async () => {
     try {
@@ -489,6 +490,18 @@ useEffect(() => {
             </div>
           )
         })}
+
+       {pedidos.some(p => p.metodo_pago === 'transferencia') && localInfo?.banco && (
+          <div style={{ background: '#1e1e1e', borderRadius: 14, padding: '14px 16px', border: '1px solid #22c55e44' }}>
+            <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 12, color: '#22c55e', letterSpacing: 1, textTransform: 'uppercase' }}>🏦 Datos para transferencia</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {localInfo.banco && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Banco</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localInfo.banco}</span></div>}
+              {localInfo.cuenta_bancaria && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Cuenta</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localInfo.cuenta_bancaria}</span></div>}
+              {localInfo.titular_cuenta && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Titular</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localInfo.titular_cuenta}</span></div>}
+              {localInfo.alias_cuenta && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 13, color: '#666' }}>Alias</span><span style={{ fontSize: 13, color: 'white', fontWeight: 600 }}>{localInfo.alias_cuenta}</span></div>}
+            </div>
+          </div>
+        )}
 
         {hayActivos && (
           <div style={{ background: '#1e1e1e', borderRadius: 14, padding: '12px 16px', border: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 10 }}>
