@@ -27,6 +27,16 @@ export default function Pedido() {
   const tipo = searchParams.get('tipo') || 'mesa'
   const navigate = useNavigate()
   const { items, quitar, agregar, total, limpiar, local } = useCarrito()
+  const [localData, setLocalData] = useState(null)
+
+  useEffect(() => {
+    if (local) { setLocalData(local); return }
+    if (slug) {
+      axios.get(`${API}/locales/${slug}`)
+        .then(r => setLocalData(r.data))
+        .catch(() => {})
+    }
+  }, [local, slug])
 
   const [nombre, setNombre] = useState('')
   const [nota, setNota] = useState('')
@@ -74,8 +84,8 @@ useEffect(() => {
   useEffect(() => {
     if (!mapListo || !mapRef.current || !esDelivery) return
     const google = window.google
-    const defaultLat = local?.latitud || -25.2867
-    const defaultLng = local?.longitud || -57.647
+    const defaultLat = localData?.latitud || -25.2867
+    const defaultLng = localData?.longitud || -57.647
 
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: defaultLat, lng: defaultLng },
@@ -115,10 +125,10 @@ useEffect(() => {
         if (geoData.results[0]) setDireccion(geoData.results[0].formatted_address)
 
         // Haversine para distancia
-        if (local?.latitud && local?.longitud) {
-          const km = calcularDistanciaKm(local.latitud, local.longitud, lat, lng)
+        if (localData?.latitud && localData?.longitud) {
+          const km = calcularDistanciaKm(localData.latitud, localData.longitud, lat, lng)
           setDistanciaKm(km.toFixed(1))
-          setCostoDelivery(Math.ceil(km) * (local?.costo_km || 0))
+          setCostoDelivery(Math.ceil(km) * (localData?.costo_km || 0))
         }
       } catch (e) {}
       finally { setCalculando(false) }
@@ -173,7 +183,7 @@ useEffect(() => {
     setEnviando(true)
     try {
       const res = await axios.post(`${API}/pedidos/`, {
-        local_id: local.id,
+        local_id: localData?.id || local?.id,
         numero_mesa: mesa ? parseInt(mesa) : null,
         nombre_cliente: nombre || null,
         nota_general: nota || null,
