@@ -1,9 +1,11 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState, useEffect } from 'react'
 
 const CarritoContext = createContext()
 
 export function CarritoProvider({ children }) {
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('carrito')) || [] } catch { return [] }
+  })
   const [local, setLocal] = useState(null)
   const [mesa, setMesa] = useState(null)
 
@@ -27,8 +29,10 @@ export function CarritoProvider({ children }) {
     })
   }
 
-  const limpiar = () => setItems([])
-
+  const limpiar = () => { setItems([]); sessionStorage.removeItem('carrito') }
+  useEffect(() => {
+    sessionStorage.setItem('carrito', JSON.stringify(items))
+  }, [items])
   const total = items.reduce((acc, i) => acc + i.precio * i.cantidad, 0)
   const cantidad = items.reduce((acc, i) => acc + i.cantidad, 0)
 
