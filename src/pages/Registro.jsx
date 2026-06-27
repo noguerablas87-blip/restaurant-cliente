@@ -255,7 +255,7 @@ export default function Registro() {
               </button>
 
               <p style={{ margin: '16px 0 0', fontSize: 12, color: '#aaa', textAlign: 'center' }}>
-                Al registrarte aceptás los términos de uso de Valmai
+                Al registrarte aceptás los <a href="https://valmai.com.py/terminos.html" target="_blank" rel="noopener" style={{ color: '#1D9E75', fontWeight: 600, textDecoration: 'underline' }}>términos de uso de Valmai</a>
               </p>
             </>
           )}
