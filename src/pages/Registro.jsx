@@ -7,6 +7,9 @@ export default function Registro() {
   const [paso, setPaso] = useState(1)
   const [enviando, setEnviando] = useState(false)
   const [credenciales, setCredenciales] = useState(null)
+  const [codigo, setCodigo] = useState('')
+  const [reenviando, setReenviando] = useState(false)
+  const [avisoReenvio, setAvisoReenvio] = useState('')
   const [form, setForm] = useState({
     nombre: '',
     slug: '',
@@ -58,15 +61,60 @@ export default function Registro() {
         tiempo_prep_min: 15,
       })
       setCredenciales({ slug: form.slug, password: form.password, nombre: form.nombre, email: form.email })
-      setPaso(3)
+      setPaso(3) // Ir al paso de verificación de código
     } catch (e) {
       if (e.response?.data?.detail?.includes('slug')) {
         setError('Ese nombre de URL ya está en uso. Elegí otro.')
+      } else if (e.response?.data?.detail?.includes('email')) {
+        setError('El email es obligatorio y debe ser válido.')
       } else {
         setError('Error al registrar. Intentá de nuevo.')
       }
     } finally {
       setEnviando(false)
+    }
+  }
+
+  const verificarCodigo = async () => {
+    if (!codigo || codigo.length < 6) {
+      setError('Ingresá el código de 6 dígitos')
+      return
+    }
+    setError('')
+    setEnviando(true)
+    try {
+      await axios.post(`${API}/locales/verificar-email`, {
+        slug: credenciales.slug,
+        codigo: codigo.trim(),
+      })
+      setPaso(4) // Ir al paso de éxito
+    } catch (e) {
+      const detalle = e.response?.data?.detail || ''
+      if (detalle.includes('incorrecto')) {
+        setError('Código incorrecto. Revisá el correo.')
+      } else if (detalle.includes('venció')) {
+        setError('El código venció. Pedí uno nuevo abajo.')
+      } else {
+        setError('No se pudo verificar. Intentá de nuevo.')
+      }
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const reenviarCodigo = async () => {
+    setError('')
+    setAvisoReenvio('')
+    setReenviando(true)
+    try {
+      await axios.post(`${API}/locales/reenviar-codigo`, {
+        slug: credenciales.slug,
+      })
+      setAvisoReenvio('✓ Te enviamos un código nuevo a tu correo.')
+    } catch (e) {
+      setError('No se pudo reenviar el código. Intentá de nuevo.')
+    } finally {
+      setReenviando(false)
     }
   }
 
@@ -164,6 +212,7 @@ export default function Registro() {
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 4 }}>Email *</label>
                   <input type="email" placeholder="tu@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={inputStyle} />
+                  <p style={{ margin: '4px 0 0', fontSize: 11, color: '#aaa' }}>Te enviaremos un código de verificación a este correo</p>
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 4 }}>Contraseña *</label>
@@ -187,13 +236,56 @@ export default function Registro() {
             </>
           )}
 
-          {/* Paso 3 — Éxito */}
+          {/* Paso 3 — Verificación de código */}
           {paso === 3 && credenciales && (
             <>
               <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{ fontSize: 56, marginBottom: 12 }}>📧</div>
+                <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800 }}>Verificá tu correo</h2>
+                <p style={{ margin: 0, color: '#888', fontSize: 14 }}>
+                  Te enviamos un código de 6 dígitos a<br />
+                  <strong style={{ color: '#333' }}>{credenciales.email}</strong>
+                </p>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 4 }}>Código de verificación *</label>
+                <input
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={codigo}
+                  onChange={e => setCodigo(e.target.value.replace(/[^0-9]/g, ''))}
+                  style={{ ...inputStyle, textAlign: 'center', fontSize: 28, letterSpacing: 10, fontWeight: 700 }}
+                />
+              </div>
+
+              {error && <p style={{ color: 'red', fontSize: 13, margin: '12px 0 0', textAlign: 'center' }}>{error}</p>}
+              {avisoReenvio && <p style={{ color: '#1D9E75', fontSize: 13, margin: '12px 0 0', textAlign: 'center' }}>{avisoReenvio}</p>}
+
+              <button onClick={verificarCodigo} disabled={enviando} style={{ width: '100%', marginTop: 20, background: enviando ? '#ccc' : '#1D9E75', color: 'white', border: 'none', borderRadius: 14, padding: '15px', fontSize: 16, fontWeight: 700, cursor: enviando ? 'not-allowed' : 'pointer' }}>
+                {enviando ? 'Verificando...' : 'Verificar y activar →'}
+              </button>
+
+              <div style={{ textAlign: 'center', marginTop: 16 }}>
+                <span style={{ fontSize: 13, color: '#aaa' }}>¿No te llegó? </span>
+                <button onClick={reenviarCodigo} disabled={reenviando} style={{ background: 'none', border: 'none', color: '#1D9E75', fontSize: 13, fontWeight: 600, cursor: reenviando ? 'not-allowed' : 'pointer', padding: 0 }}>
+                  {reenviando ? 'Enviando...' : 'Reenviar código'}
+                </button>
+              </div>
+              <p style={{ margin: '12px 0 0', fontSize: 11, color: '#bbb', textAlign: 'center' }}>
+                Revisá tu bandeja de entrada y la carpeta de spam
+              </p>
+            </>
+          )}
+
+          {/* Paso 4 — Éxito */}
+          {paso === 4 && credenciales && (
+            <>
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
                 <div style={{ fontSize: 56, marginBottom: 12 }}>🎉</div>
-                <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800 }}>¡Local creado!</h2>
-                <p style={{ margin: 0, color: '#888', fontSize: 14 }}>Tenés 30 días gratis para probar Valmai</p>
+                <h2 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800 }}>¡Local activado!</h2>
+                <p style={{ margin: 0, color: '#888', fontSize: 14 }}>Tu cuenta fue verificada. Tenés 30 días gratis para probar Valmai</p>
               </div>
 
               <div style={{ background: '#f8f8f8', borderRadius: 14, padding: 20, marginBottom: 20 }}>
