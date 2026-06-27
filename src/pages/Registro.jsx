@@ -293,7 +293,7 @@ export default function Registro() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 13, color: '#666' }}>URL tablet</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>restaurant-tablet.vercel.app</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>panel.valmai.com.py</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 13, color: '#666' }}>Slug</span>
@@ -310,7 +310,7 @@ export default function Registro() {
                 </div>
               </div>
 
-              <a href="https://restaurant-tablet.vercel.app/login" target="_blank" style={{ display: 'block', width: '100%', boxSizing: 'border-box', background: '#1D9E75', color: 'white', border: 'none', borderRadius: 14, padding: '15px', fontSize: 16, fontWeight: 700, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>
+              <a href="https://panel.valmai.com.py/login" target="_blank" style={{ display: 'block', width: '100%', boxSizing: 'border-box', background: '#1D9E75', color: 'white', border: 'none', borderRadius: 14, padding: '15px', fontSize: 16, fontWeight: 700, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>
                 Ir al panel de mi restaurante →
               </a>
 
@@ -322,7 +322,7 @@ export default function Registro() {
         </div>
 
         <p style={{ textAlign: 'center', color: '#333', fontSize: 13, marginTop: 20 }}>
-          ¿Ya tenés cuenta? <a href="https://restaurant-tablet.vercel.app/login" style={{ color: '#1D9E75', fontWeight: 600 }}>Entrá a tu panel</a>
+          ¿Ya tenés cuenta? <a href="https://panel.valmai.com.py/login" style={{ color: '#1D9E75', fontWeight: 600 }}>Entrá a tu panel</a>
         </p>
       </div>
     </div>
