@@ -12,6 +12,7 @@ export default function VisorAR({ producto, onClose }) {
   const [cargando, setCargando] = useState(true)
   const [abriendoAR, setAbriendoAR] = useState(false)
   const [error, setError] = useState(null)
+  const [mostrarHintMesa, setMostrarHintMesa] = useState(false)
 
   useEffect(() => {
     let renderer, camera, scene, animId
@@ -391,7 +392,7 @@ export default function VisorAR({ producto, onClose }) {
     }
   }, [producto])
 
-  // NUEVO: escucha el estado real del intento de AR (Scene Viewer / Quick Look)
+  // Escucha el estado real del intento de AR (Scene Viewer / Quick Look)
   useEffect(() => {
     const mv = mvRef.current
     if (!mv) return
@@ -399,6 +400,10 @@ export default function VisorAR({ producto, onClose }) {
       console.log('AR status:', event.detail.status)
       if (event.detail.status === 'failed') {
         setError('Este dispositivo no pudo abrir la cámara AR. Puede que falte "Google Play Services de AR" instalado (buscalo en Play Store).')
+        setMostrarHintMesa(false)
+      }
+      if (event.detail.status === 'session-started') {
+        setMostrarHintMesa(false)
       }
     }
     mv.addEventListener('ar-status', onArStatus)
@@ -409,6 +414,7 @@ export default function VisorAR({ producto, onClose }) {
     if (abriendoAR || !groupRef.current || !modulesRef.current) return
     setAbriendoAR(true)
     setError(null)
+    setMostrarHintMesa(true)
     try {
       const { GLTFExporter, USDZExporter } = modulesRef.current
       const gltfExporter = new GLTFExporter()
@@ -436,6 +442,7 @@ export default function VisorAR({ producto, onClose }) {
       console.error(e)
       setError('No se pudo generar el modelo 3D. Probá de nuevo.')
       setAbriendoAR(false)
+      setMostrarHintMesa(false)
     }
   }
 
@@ -468,7 +475,19 @@ export default function VisorAR({ producto, onClose }) {
         </div>
       )}
 
-      <model-viewer ref={mvRef} ar ar-modes="webxr scene-viewer quick-look" camera-controls
+      {mostrarHintMesa && (
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          background: 'rgba(0,0,0,0.75)', color: 'white', padding: '16px 24px', borderRadius: 14,
+          fontSize: 14, fontWeight: 600, textAlign: 'center', zIndex: 20, maxWidth: 260,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8
+        }}>
+          <span style={{ fontSize: 28 }}>📷</span>
+          Apuntá la cámara hacia tu mesa y esperá unos segundos
+        </div>
+      )}
+
+      <model-viewer ref={mvRef} ar ar-modes="webxr scene-viewer quick-look" ar-scale="fixed" camera-controls
         style={{ position: 'fixed', width: 10, height: 10, opacity: 0, pointerEvents: 'none' }} />
 
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(15, 35, 64, 0.85)', backdropFilter: 'blur(14px)', borderTop: '1px solid rgba(244,241,234,0.1)', padding: '18px 20px calc(18px + env(safe-area-inset-bottom))' }}>
