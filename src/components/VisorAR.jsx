@@ -25,7 +25,7 @@ const MODELOS_REALISTAS = {
   },
   sandwich_lomito: {
     url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783203512/sandwich-lomito_rnyit6.glb',
-    rotacionX: -Math.PI / 2,
+    rotacionX: 0,
   },
   chivito: {
     url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783203584/chivito_1_tkxk9z.glb',
