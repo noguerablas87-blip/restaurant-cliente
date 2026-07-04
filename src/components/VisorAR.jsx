@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
-const THREE_URL = 'https://unpkg.com/three@0.160.0/build/three.module.js'
-const GLTF_EXPORTER_URL = 'https://unpkg.com/three@0.160.0/examples/jsm/exporters/GLTFExporter.js'
-const USDZ_EXPORTER_URL = 'https://unpkg.com/three@0.160.0/examples/jsm/exporters/USDZExporter.js'
+const THREE_URL = 'three'
+const GLTF_EXPORTER_URL = 'three/addons/exporters/GLTFExporter.js'
+const USDZ_EXPORTER_URL = 'three/addons/exporters/USDZExporter.js'
 
 export default function VisorAR({ producto, onClose }) {
   const containerRef = useRef(null)
