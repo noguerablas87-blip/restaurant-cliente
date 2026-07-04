@@ -1,605 +1,588 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 
-const THREE_URL = 'three'
-const GLTF_EXPORTER_URL = 'three/addons/exporters/GLTFExporter.js'
-const USDZ_EXPORTER_URL = 'three/addons/exporters/USDZExporter.js'
-const ROOM_ENV_URL = 'three/addons/environments/RoomEnvironment.js'
-const GLTF_LOADER_URL = 'three/addons/loaders/GLTFLoader.js'
+const API = 'https://restaurant-backend-production-1271.up.railway.app'
+const CLOUDINARY_CLOUD = 'dmunelwl2'
+const CLOUDINARY_PRESET = 'restaurante_menu'
 
-// Modelos 3D realistas (generados con IA y hosteados en Cloudinary).
-// rotacionX corrige la orientación: el generador arma el modelo "parado"
-// (mirando hacia la cámara de la foto original) en vez de "acostado"
-// mirando hacia arriba, como debe quedar sobre la mesa.
-const MODELOS_REALISTAS = {
-  pizza: {
-    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783192856/pizza-optimizado_xgw43d.glb',
-    rotacionX: -Math.PI / 2,
-  },
-  hamburguesa: {
-    rotacionX: 0,
-    porCapas: {
-      1: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197530/hamburguesa-simple_f5opyy.glb',
-      2: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197554/hamburguesa-doble_bywn4a.glb',
-      3: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197563/hamburguesa-triple_o8acbv.glb',
-    },
-  },
-}
+export default function Menu() {
+  const navigate = useNavigate()
+  const token = localStorage.getItem('token')
+  const headers = { Authorization: `Bearer ${token}` }
+  const [categorias, setCategorias] = useState([])
+  const [nuevaCat, setNuevaCat] = useState('')
+  const [nuevoProducto, setNuevoProducto] = useState({
+    nombre: '', precio: '', descripcion: '',
+    categoria_id: '', imagen_url: '', tiempo_prep: '10',
+    tipo_ar: '', medida_ar: '', medida_ar_2: ''
+  })
+  const [mostrarFormProd, setMostrarFormProd] = useState(false)
+  const [editando, setEditando] = useState(null)
+  const [previewEdicion, setPreviewEdicion] = useState(null)
+  const [subiendo, setSubiendo] = useState(false)
+  const [preview, setPreview] = useState(null)
 
-export default function VisorAR({ producto, onClose }) {
-  const containerRef = useRef(null)
-  const mvRef = useRef(null)
-  const groupRef = useRef(null)
-  const modulesRef = useRef(null)
-  const [cargando, setCargando] = useState(true)
-  const [abriendoAR, setAbriendoAR] = useState(false)
-  const [error, setError] = useState(null)
-  const [mostrarHintMesa, setMostrarHintMesa] = useState(false)
+  const [opcionesAbiertas, setOpcionesAbiertas] = useState(null)
+  const [nuevoGrupo, setNuevoGrupo] = useState({ nombre: '', obligatorio: false, seleccion_multiple: false })
+  const [nuevaOpcion, setNuevaOpcion] = useState({})
 
-  useEffect(() => {
-    let renderer, camera, scene, animId
-    let cancelado = false
-    let rotX = 0.55
-    let isDragging = false, lastX = 0
-    let cameraDistance = 9, cameraTargetY = 1.2
-    const container = containerRef.current
-
-    async function iniciar() {
-      const THREE = await import(/* @vite-ignore */ THREE_URL)
-      const { GLTFExporter } = await import(/* @vite-ignore */ GLTF_EXPORTER_URL)
-      const { USDZExporter } = await import(/* @vite-ignore */ USDZ_EXPORTER_URL)
-      const { RoomEnvironment } = await import(/* @vite-ignore */ ROOM_ENV_URL)
-      const { GLTFLoader } = await import(/* @vite-ignore */ GLTF_LOADER_URL)
-      if (cancelado) return
-      modulesRef.current = { THREE, GLTFExporter, USDZExporter }
-
-      scene = new THREE.Scene()
-      scene.background = null
-
-      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100)
-      camera.position.set(0, 6, 9)
-
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-      renderer.setSize(container.clientWidth, container.clientHeight)
-      renderer.setPixelRatio(window.devicePixelRatio)
-      renderer.shadowMap.enabled = true
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap
-      renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.toneMappingExposure = 1.1
-      renderer.outputColorSpace = THREE.SRGBColorSpace
-      container.appendChild(renderer.domElement)
-
-      const pmremGenerator = new THREE.PMREMGenerator(renderer)
-      scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
-      pmremGenerator.dispose()
-
-      const tableGeo = new THREE.CircleGeometry(9, 64)
-      const tableMat = new THREE.MeshStandardMaterial({ color: 0x2a3a52, roughness: 0.85 })
-      const table = new THREE.Mesh(tableGeo, tableMat)
-      table.rotation.x = -Math.PI / 2
-      table.position.y = -1.2
-      table.receiveShadow = true
-      scene.add(table)
-
-      scene.add(new THREE.AmbientLight(0xfff2e0, 0.55))
-      const dir = new THREE.DirectionalLight(0xfff0d0, 1.4)
-      dir.position.set(4, 9, 5)
-      dir.castShadow = true
-      dir.shadow.mapSize.set(2048, 2048)
-      dir.shadow.radius = 4
-      scene.add(dir)
-      const fill = new THREE.DirectionalLight(0x9db8e8, 0.3)
-      fill.position.set(-6, 3, -4)
-      scene.add(fill)
-      const rim = new THREE.PointLight(0xffe0b0, 0.6, 20)
-      rim.position.set(-3, 4, 6)
-      scene.add(rim)
-
-      // ---- texturas ----
-      function makeBunTopTexture() {
-        const size = 512
-        const c = document.createElement('canvas')
-        c.width = size; c.height = size
-        const ctx = c.getContext('2d')
-        const grad = ctx.createRadialGradient(size/2, size*0.35, size*0.05, size/2, size*0.4, size*0.55)
-        grad.addColorStop(0, '#E8B25E'); grad.addColorStop(1, '#C98A3C')
-        ctx.fillStyle = grad; ctx.fillRect(0,0,size,size)
-        for (let i=0;i<45;i++){
-          const x = size*0.15 + Math.random()*size*0.7, y = size*0.1 + Math.random()*size*0.55
-          ctx.save(); ctx.translate(x,y); ctx.rotate(Math.random()*Math.PI)
-          ctx.fillStyle = '#F5E6C8'; ctx.beginPath(); ctx.ellipse(0,0,7,3.5,0,0,Math.PI*2); ctx.fill(); ctx.restore()
-        }
-        return new THREE.CanvasTexture(c)
-      }
-      function makeBunSideTexture() {
-        const size = 256
-        const c = document.createElement('canvas')
-        c.width = size; c.height = size
-        const ctx = c.getContext('2d')
-        ctx.fillStyle = '#D9A054'; ctx.fillRect(0,0,size,size)
-        for (let i=0;i<200;i++){
-          const x = Math.random()*size, y = Math.random()*size
-          ctx.fillStyle = Math.random()>0.5 ? 'rgba(150,90,30,0.3)' : 'rgba(240,210,150,0.4)'
-          ctx.beginPath(); ctx.arc(x,y,1+Math.random()*2,0,Math.PI*2); ctx.fill()
-        }
-        const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(4,1)
-        return tex
-      }
-      function makePattyTexture() {
-        const size = 1024
-        const c = document.createElement('canvas')
-        c.width = size; c.height = size
-        const ctx = c.getContext('2d')
-        ctx.fillStyle = '#5C3A28'; ctx.fillRect(0,0,size,size)
-        ctx.strokeStyle = 'rgba(20,10,5,0.55)'
-        ctx.lineWidth = size * 0.035
-        for (let i = -2; i < 6; i++) {
-          ctx.beginPath()
-          ctx.moveTo(i * size * 0.22, 0)
-          ctx.lineTo(i * size * 0.22 + size * 0.4, size)
-          ctx.stroke()
-        }
-        for (let i=0;i<320;i++){
-          const x = Math.random()*size, y = Math.random()*size
-          ctx.fillStyle = Math.random()>0.5 ? 'rgba(30,15,10,0.5)' : 'rgba(120,75,45,0.4)'
-          ctx.beginPath(); ctx.arc(x,y,3+Math.random()*7,0,Math.PI*2); ctx.fill()
-        }
-        return new THREE.CanvasTexture(c)
-      }
-      function makeCheeseTexture() {
-        const size = 1024
-        const c = document.createElement('canvas')
-        c.width = size; c.height = size
-        const ctx = c.getContext('2d')
-        const grad = ctx.createRadialGradient(size/2, size/2, size*0.1, size/2, size/2, size/2)
-        grad.addColorStop(0, '#F3D98A'); grad.addColorStop(1, '#E8C468')
-        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(size/2, size/2, size/2, 0, Math.PI*2); ctx.fill()
-        for (let i = 0; i < 90; i++) {
-          const a = Math.random() * Math.PI * 2
-          const r = Math.pow(Math.random(), 0.5) * size * 0.42
-          const x = size/2 + Math.cos(a) * r, y = size/2 + Math.sin(a) * r
-          const s = 6 + Math.random() * 16
-          ctx.fillStyle = `rgba(193, 58, 34, ${0.5 + Math.random()*0.3})`
-          ctx.beginPath(); ctx.arc(x, y, s, 0, Math.PI*2); ctx.fill()
-        }
-        return new THREE.CanvasTexture(c)
-      }
-      function makeCrustTexture() {
-        const size = 1024
-        const c = document.createElement('canvas')
-        c.width = size; c.height = size
-        const ctx = c.getContext('2d')
-        ctx.fillStyle = '#D9A054'; ctx.fillRect(0,0,size,size)
-        for (let i=0;i<400;i++){
-          const x = Math.random()*size, y = Math.random()*size, s = 1+Math.random()*3
-          ctx.fillStyle = Math.random()>0.5 ? 'rgba(140,80,20,0.35)' : 'rgba(240,200,140,0.5)'
-          ctx.beginPath(); ctx.arc(x,y,s,0,Math.PI*2); ctx.fill()
-        }
-        const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(6,1)
-        return tex
-      }
-
-      function makeLettuceEdge(radius) {
-        const mat = new THREE.MeshStandardMaterial({ color: 0x6FAE4C, roughness: 0.6, side: THREE.DoubleSide })
-        const segs = 40
-        const shape = new THREE.Shape()
-        for (let i=0;i<=segs;i++){
-          const a = (i/segs)*Math.PI*2
-          const wobble = 1 + Math.sin(a*9)*0.06 + Math.sin(a*17)*0.03
-          const x = Math.cos(a)*radius*1.08*wobble, y = Math.sin(a)*radius*1.08*wobble
-          if (i===0) shape.moveTo(x,y); else shape.lineTo(x,y)
-        }
-        const hole = new THREE.Path()
-        for (let i=0;i<=segs;i++){
-          const a = (i/segs)*Math.PI*2
-          hole.lineTo(Math.cos(a)*radius*0.9, Math.sin(a)*radius*0.9)
-        }
-        shape.holes.push(hole)
-        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat)
-        mesh.rotation.x = -Math.PI/2
-        return mesh
-      }
-      function makeCheeseDrape(radius) {
-        const segs = 4
-        const shape = new THREE.Shape()
-        const s = radius*1.05
-        shape.moveTo(-s, -s)
-        for (let i=0;i<=segs;i++){
-          const t = i/segs, x = -s + t*2*s, droop = Math.sin(t*Math.PI)*radius*0.12
-          shape.lineTo(x, s + droop)
-        }
-        shape.lineTo(s, -s); shape.lineTo(-s, -s)
-        const mat = new THREE.MeshPhysicalMaterial({ color: 0xF2C332, roughness: 0.3, metalness: 0.0, clearcoat: 0.5, clearcoatRoughness: 0.2, side: THREE.DoubleSide })
-        const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat)
-        mesh.rotation.x = -Math.PI/2
-        return mesh
-      }
-
-      function buildBurger(diameterCm, pattyCount) {
-        const group = new THREE.Group()
-        const radius = 4.2 * (diameterCm / 12)
-        const scaleF = radius/4.2
-        let y = 0
-
-        const bottomBun = new THREE.Mesh(
-          new THREE.CylinderGeometry(radius, radius*0.92, 0.5*scaleF, 48),
-          new THREE.MeshStandardMaterial({ map: makeBunSideTexture(), roughness: 0.75, color: 0xE8C378 })
-        )
-        bottomBun.position.y = y + 0.25*scaleF
-        bottomBun.castShadow = true; bottomBun.receiveShadow = true
-        group.add(bottomBun)
-        y += 0.5*scaleF
-
-        const lettuce = makeLettuceEdge(radius)
-        lettuce.position.y = y + 0.03*scaleF
-        group.add(lettuce)
-        y += 0.1*scaleF
-
-        const tomato = new THREE.Mesh(
-          new THREE.CylinderGeometry(radius*0.88, radius*0.88, 0.18*scaleF, 32),
-          new THREE.MeshStandardMaterial({ color: 0xD8402C, roughness: 0.3 })
-        )
-        tomato.position.y = y + 0.09*scaleF
-        group.add(tomato)
-        y += 0.18*scaleF
-
-        const pattyMat = new THREE.MeshStandardMaterial({ map: makePattyTexture(), roughness: 0.6 })
-        for (let p = 0; p < pattyCount; p++) {
-          const patty = new THREE.Mesh(new THREE.CylinderGeometry(radius*0.95, radius*0.9, 0.35*scaleF, 32), pattyMat)
-          patty.position.y = y + 0.175*scaleF
-          patty.castShadow = true
-          group.add(patty)
-          y += 0.35*scaleF
-
-          const cheeseDrape = makeCheeseDrape(radius*0.85)
-          cheeseDrape.position.y = y + 0.02*scaleF
-          group.add(cheeseDrape)
-          y += 0.08*scaleF
-        }
-
-        const topBun = new THREE.Mesh(
-          new THREE.SphereGeometry(radius, 48, 24, 0, Math.PI*2, 0, Math.PI*0.42),
-          new THREE.MeshStandardMaterial({ map: makeBunTopTexture(), roughness: 0.7, color: 0xEBC583 })
-        )
-        topBun.scale.set(1, 0.38, 1)
-        topBun.position.y = y
-        topBun.castShadow = true
-        group.add(topBun)
-
-        const totalHeight = y + radius*0.4
-        const maxDim = Math.max(radius*2, totalHeight)
-        return { group, cameraDistance: maxDim * 2.1, cameraTargetY: totalHeight * 0.45 }
-      }
-
-      function addToppings(group, radius, doughHeight) {
-        const topY = doughHeight + 0.09
-        const scaleF = radius/5
-        const pepMat = new THREE.MeshStandardMaterial({ color: 0xB23A2E, roughness: 0.35, metalness: 0.15 })
-        const pepEdgeMat = new THREE.MeshStandardMaterial({ color: 0x7A2018, roughness: 0.4 })
-        const oliveMat = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.3, metalness: 0.2 })
-        const basilMat = new THREE.MeshStandardMaterial({ color: 0x2E6B2E, roughness: 0.5, side: THREE.DoubleSide })
-
-        function makePepperoni(s) {
-          const g = new THREE.Group()
-          g.add(new THREE.Mesh(new THREE.CylinderGeometry(s, s*0.92, s*0.22, 20), pepMat))
-          const ring = new THREE.Mesh(new THREE.TorusGeometry(s*0.94, s*0.08, 8, 20), pepEdgeMat)
-          ring.rotation.x = Math.PI/2
-          g.add(ring)
-          return g
-        }
-        function makeOlive(s) {
-          const ring = new THREE.Mesh(new THREE.TorusGeometry(s*0.55, s*0.32, 10, 16), oliveMat)
-          ring.rotation.x = Math.PI/2
-          return ring
-        }
-        function makeBasil(s) {
-          const shape = new THREE.Shape()
-          shape.moveTo(0, s)
-          shape.quadraticCurveTo(s*0.7, s*0.5, 0, -s)
-          shape.quadraticCurveTo(-s*0.7, s*0.5, 0, s)
-          const leaf = new THREE.Mesh(new THREE.ShapeGeometry(shape), basilMat)
-          leaf.rotation.x = -Math.PI/2
-          return leaf
-        }
-        function randPos(margin, minDist, placed) {
-          for (let attempt = 0; attempt < 30; attempt++) {
-            const a = Math.random()*Math.PI*2
-            const r = Math.sqrt(Math.random()) * radius * margin
-            const x = Math.cos(a)*r, z = Math.sin(a)*r
-            let ok = true
-            for (const [px,pz] of placed) { if (Math.hypot(x-px, z-pz) < minDist) { ok = false; break } }
-            if (ok) { placed.push([x,z]); return [x,z] }
-          }
-          const a = Math.random()*Math.PI*2
-          const r = Math.sqrt(Math.random()) * radius * margin
-          const x = Math.cos(a)*r, z = Math.sin(a)*r
-          placed.push([x,z])
-          return [x,z]
-        }
-        const placed = []
-        const pepR = 0.55*scaleF
-        for (let i=0;i<9;i++) { const [x,z] = randPos(0.75, pepR*1.7, placed); const p = makePepperoni(pepR); p.position.set(x, topY, z); p.rotation.y = Math.random()*Math.PI; group.add(p) }
-        for (let i=0;i<7;i++) { const [x,z] = randPos(0.72, pepR*1.4, placed); const o = makeOlive(0.32*scaleF); o.position.set(x, topY+0.02, z); group.add(o) }
-        for (let i=0;i<8;i++) { const [x,z] = randPos(0.7, pepR*1.1, placed); const b = makeBasil(0.28*scaleF); b.position.set(x, topY+0.03, z); b.rotation.z = Math.random()*Math.PI*2; group.add(b) }
-      }
-
-      function buildPizza(diameterCm, slices) {
-        const group = new THREE.Group()
-        const radius = 5 * (diameterCm / 40)
-        const doughHeight = 0.42
-        const segs = 80
-        const doughShape = new THREE.Shape()
-        for (let i = 0; i <= segs; i++) {
-          const a = (i/segs) * Math.PI * 2
-          const wobble = 1 + (Math.sin(a*7) * 0.012) + (Math.sin(a*13)*0.008)
-          const x = Math.cos(a) * radius * wobble, y = Math.sin(a) * radius * wobble
-          if (i===0) doughShape.moveTo(x,y); else doughShape.lineTo(x,y)
-        }
-        const doughGeo = new THREE.ExtrudeGeometry(doughShape, { depth: doughHeight, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.08, bevelSegments: 4, curveSegments: 64 })
-        doughGeo.rotateX(-Math.PI/2)
-        const crustTex = makeCrustTexture()
-        const dough = new THREE.Mesh(doughGeo, new THREE.MeshStandardMaterial({ map: crustTex, roughness: 0.85, color: 0xE0A868 }))
-        dough.castShadow = true; dough.receiveShadow = true
-        group.add(dough)
-
-        const rimMesh = new THREE.Mesh(new THREE.TorusGeometry(radius * 0.94, radius * 0.09, 20, 80), new THREE.MeshStandardMaterial({ map: crustTex, roughness: 0.8 }))
-        rimMesh.rotation.x = Math.PI / 2
-        rimMesh.position.y = doughHeight * 0.95
-        rimMesh.castShadow = true
-        group.add(rimMesh)
-
-        const top = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.86, 64), new THREE.MeshPhysicalMaterial({ map: makeCheeseTexture(), roughness: 0.35, metalness: 0.0, clearcoat: 0.5, clearcoatRoughness: 0.25 }))
-        top.rotation.x = -Math.PI / 2
-        top.position.y = doughHeight + 0.05
-        top.receiveShadow = true
-        group.add(top)
-
-        const bumpMat = new THREE.MeshStandardMaterial({ color: 0xF3E3B0, roughness: 0.5 })
-        for (let i = 0; i < 26; i++) {
-          const a = Math.random() * Math.PI * 2, r = radius * 0.83, s = 0.08 + Math.random()*0.1
-          const bump = new THREE.Mesh(new THREE.SphereGeometry(s * (radius/5), 6, 6), bumpMat)
-          bump.position.set(Math.cos(a)*r, doughHeight + 0.08, Math.sin(a)*r)
-          bump.scale.y = 0.35
-          group.add(bump)
-        }
-
-        const cutMat = new THREE.MeshStandardMaterial({ color: 0x8a5a2a, roughness: 1 })
-        for (let i = 0; i < slices; i++) {
-          const angle = (i / slices) * Math.PI * 2, len = radius * 0.85
-          const cut = new THREE.Mesh(new THREE.BoxGeometry(len, 0.012, 0.01), cutMat)
-          cut.position.set(Math.cos(angle)*len/2, doughHeight + 0.075, Math.sin(angle)*len/2)
-          cut.rotation.y = -angle
-          group.add(cut)
-        }
-
-        addToppings(group, radius, doughHeight)
-        const totalHeight = doughHeight + radius*0.15
-        return { group, cameraDistance: radius * 2.6, cameraTargetY: totalHeight * 0.3 }
-      }
-
-      // ---- carga de modelos 3D realistas (generados con IA), hosteados en Cloudinary ----
-      async function cargarModeloRealista(url, correccionRotX = 0) {
-        const loader = new GLTFLoader()
-        const gltf = await loader.loadAsync(url)
-        const group = gltf.scene
-
-        group.traverse((obj) => {
-          if (obj.isMesh) {
-            obj.castShadow = true
-            obj.receiveShadow = true
-          }
-        })
-
-        if (correccionRotX) {
-          group.rotation.x = correccionRotX
-        }
-        group.updateMatrixWorld(true)
-
-        const box = new THREE.Box3().setFromObject(group)
-        const size = new THREE.Vector3()
-        const center = new THREE.Vector3()
-        box.getSize(size)
-        box.getCenter(center)
-
-        const wrapper = new THREE.Group()
-        wrapper.add(group)
-        group.position.set(-center.x, -box.min.y, -center.z)
-
-        const totalHeight = size.y
-        const maxDim = Math.max(size.x, size.z, totalHeight)
-        return { group: wrapper, cameraDistance: maxDim * 2.4, cameraTargetY: totalHeight * 0.45 }
-      }
-
-      // ---- armar según el producto real ----
-      let result
-      const tipo = producto.tipo_ar
-
-      if (tipo === 'pizza' && MODELOS_REALISTAS.pizza) {
-        result = await cargarModeloRealista(MODELOS_REALISTAS.pizza.url, MODELOS_REALISTAS.pizza.rotacionX || 0)
-      } else if (tipo === 'hamburguesa' && MODELOS_REALISTAS.hamburguesa) {
-        const capas = Math.max(1, Math.min(3, Math.round(producto.medida_ar || 2)))
-        const urlHamburguesa = MODELOS_REALISTAS.hamburguesa.porCapas[capas]
-        if (urlHamburguesa) {
-          result = await cargarModeloRealista(urlHamburguesa, MODELOS_REALISTAS.hamburguesa.rotacionX || 0)
-        } else {
-          result = buildBurger(12, capas)
-        }
-      } else if (tipo === 'pizza') {
-        result = buildPizza(producto.medida_ar || 30, 8)
-      } else {
-        result = buildBurger(12, Math.max(1, Math.round(producto.medida_ar || 2)))
-      }
-      if (cancelado) return
-
-      groupRef.current = result.group
-      scene.add(result.group)
-      cameraDistance = result.cameraDistance
-      cameraTargetY = result.cameraTargetY
-
-      function animate() {
-        animId = requestAnimationFrame(animate)
-        camera.position.x = Math.sin(rotX) * cameraDistance
-        camera.position.z = Math.cos(rotX) * cameraDistance
-        camera.position.y = cameraTargetY + cameraDistance * 0.45
-        camera.lookAt(0, cameraTargetY, 0)
-        renderer.render(scene, camera)
-      }
-      animate()
-      setCargando(false)
-    }
-
-    const onPointerDown = (e) => { isDragging = true; lastX = e.clientX }
-    const onPointerUp = () => { isDragging = false }
-    const onPointerMove = (e) => { if (!isDragging) return; const dx = e.clientX - lastX; rotX -= dx * 0.008; lastX = e.clientX }
-    const onResize = () => {
-      if (!camera || !renderer) return
-      camera.aspect = container.clientWidth / container.clientHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(container.clientWidth, container.clientHeight)
-    }
-    container.addEventListener('pointerdown', onPointerDown)
-    window.addEventListener('pointerup', onPointerUp)
-    window.addEventListener('pointermove', onPointerMove)
-    window.addEventListener('resize', onResize)
-
-    iniciar()
-
-    return () => {
-      cancelado = true
-      if (animId) cancelAnimationFrame(animId)
-      container.removeEventListener('pointerdown', onPointerDown)
-      window.removeEventListener('pointerup', onPointerUp)
-      window.removeEventListener('pointermove', onPointerMove)
-      window.removeEventListener('resize', onResize)
-      if (renderer) {
-        renderer.dispose()
-        if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement)
-      }
-    }
-  }, [producto])
-
-  useEffect(() => {
-    const mv = mvRef.current
-    if (!mv) return
-    const onArStatus = (event) => {
-      console.log('AR status:', event.detail.status)
-      if (event.detail.status === 'failed') {
-        setError('Este dispositivo no pudo abrir la cámara AR. Puede que falte "Google Play Services de AR" instalado (buscalo en Play Store).')
-        setMostrarHintMesa(false)
-      }
-      if (event.detail.status === 'session-started') {
-        setMostrarHintMesa(false)
-      }
-    }
-    mv.addEventListener('ar-status', onArStatus)
-    return () => mv.removeEventListener('ar-status', onArStatus)
-  }, [])
-
-  const activarAR = async () => {
-    if (abriendoAR || !groupRef.current || !modulesRef.current) return
-    setAbriendoAR(true)
-    setError(null)
-    setMostrarHintMesa(true)
+  const cargar = async () => {
     try {
-      const { THREE, GLTFExporter, USDZExporter } = modulesRef.current
+      const res = await axios.get(`${API}/menu/${localStorage.getItem('slug') || 'don-carlos'}`)
+      const cats = res.data.categorias.map(cat => ({
+        ...cat,
+        productos: cat.productos.filter(p => !p.eliminado)
+      }))
+      setCategorias(cats)
+    } catch (e) { }
+  }
 
-      const clone = groupRef.current.clone(true)
-      clone.updateMatrixWorld(true)
-      const box = new THREE.Box3().setFromObject(clone)
-      const size = new THREE.Vector3()
-      box.getSize(size)
-      const diametroActualEnUnidades = Math.max(size.x, size.z)
-      const diametroObjetivoEnMetros = (producto.tipo_ar === 'pizza'
-        ? (producto.medida_ar || 30)
-        : 12) / 100
-      const factorEscala = diametroActualEnUnidades > 0
-        ? diametroObjetivoEnMetros / diametroActualEnUnidades
-        : 1
-      clone.scale.setScalar(factorEscala)
+  useEffect(() => { cargar() }, [])
 
-      const gltfExporter = new GLTFExporter()
-      const glbBuffer = await new Promise((resolve, reject) => {
-        gltfExporter.parse(clone, resolve, reject, { binary: true })
-      })
-      const glbUrl = URL.createObjectURL(new Blob([glbBuffer], { type: 'model/gltf-binary' }))
-
-      const mv = mvRef.current
-      mv.src = glbUrl
-
-      try {
-        const usdzExporter = new USDZExporter()
-        const usdzBuffer = await usdzExporter.parseAsync(clone)
-        mv.iosSrc = URL.createObjectURL(new Blob([usdzBuffer], { type: 'model/vnd.usdz+zip' }))
-      } catch (usdzErr) {
-        console.warn('No se pudo generar USDZ (solo afecta iPhone):', usdzErr)
-      }
-
-      const launch = () => { mv.activateAR(); setAbriendoAR(false) }
-      if (mv.loaded) launch()
-      else mv.addEventListener('load', launch, { once: true })
+  const subirFoto = async (archivo) => {
+    setSubiendo(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', archivo)
+      formData.append('upload_preset', CLOUDINARY_PRESET)
+      const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, formData)
+      setNuevoProducto(prev => ({ ...prev, imagen_url: res.data.secure_url }))
+      setPreview(res.data.secure_url)
     } catch (e) {
-      console.error(e)
-      setError('No se pudo generar el modelo 3D. Probá de nuevo.')
-      setAbriendoAR(false)
-      setMostrarHintMesa(false)
+      alert('Error al subir la imagen')
+    } finally {
+      setSubiendo(false)
     }
   }
 
-  const medidaTexto = producto.tipo_ar === 'pizza'
-    ? `${producto.medida_ar} cm de diámetro`
-    : `${producto.medida_ar} capa${producto.medida_ar > 1 ? 's' : ''} de carne`
+  const subirFotoEdicion = async (archivo) => {
+    setSubiendo(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', archivo)
+      formData.append('upload_preset', CLOUDINARY_PRESET)
+      const res = await axios.post(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, formData)
+      setEditando(prev => ({ ...prev, imagen_url: res.data.secure_url }))
+      setPreviewEdicion(res.data.secure_url)
+    } catch (e) {
+      alert('Error al subir la imagen')
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  const crearCategoria = async () => {
+    if (!nuevaCat) return
+    try {
+      await axios.post(`${API}/menu/categorias`, { nombre: nuevaCat, orden: 0 }, { headers })
+      setNuevaCat('')
+      cargar()
+    } catch (e) { }
+  }
+
+  const crearProducto = async () => {
+    if (!nuevoProducto.nombre || !nuevoProducto.precio || !nuevoProducto.categoria_id) return
+    try {
+      await axios.post(`${API}/menu/productos`, {
+        ...nuevoProducto,
+        precio: parseFloat(nuevoProducto.precio),
+        categoria_id: parseInt(nuevoProducto.categoria_id),
+        tiempo_prep: parseInt(nuevoProducto.tiempo_prep) || 10,
+        tipo_ar: nuevoProducto.tipo_ar || null,
+        medida_ar: nuevoProducto.medida_ar ? parseFloat(nuevoProducto.medida_ar) : null,
+        medida_ar_2: nuevoProducto.medida_ar_2 ? parseFloat(nuevoProducto.medida_ar_2) : null,
+      }, { headers })
+      setNuevoProducto({ nombre: '', precio: '', descripcion: '', categoria_id: '', imagen_url: '', tiempo_prep: '10', tipo_ar: '', medida_ar: '', medida_ar_2: '' })
+      setPreview(null)
+      setMostrarFormProd(false)
+      cargar()
+    } catch (e) { }
+  }
+
+  const editarProducto = async () => {
+    if (!editando) return
+    try {
+      await axios.patch(`${API}/menu/productos/${editando.id}`, {
+        nombre: editando.nombre,
+        precio: parseFloat(editando.precio),
+        descripcion: editando.descripcion,
+        tiempo_prep: parseInt(editando.tiempo_prep) || 10,
+        imagen_url: editando.imagen_url || null,
+        tipo_ar: editando.tipo_ar || null,
+        medida_ar: editando.medida_ar ? parseFloat(editando.medida_ar) : null,
+        medida_ar_2: editando.medida_ar_2 ? parseFloat(editando.medida_ar_2) : null,
+      }, { headers })
+      setEditando(null)
+      setPreviewEdicion(null)
+      cargar()
+    } catch (e) { alert('Error al guardar') }
+  }
+
+  const toggleDisponible = async (id, disponible) => {
+    try {
+      await axios.patch(`${API}/menu/productos/${id}`, { disponible: !disponible }, { headers })
+      cargar()
+    } catch (e) { }
+  }
+
+  const eliminarProducto = async (id) => {
+    if (!confirm('¿Eliminar este producto?')) return
+    try {
+      await axios.delete(`${API}/menu/productos/${id}`, { headers })
+      cargar()
+    } catch (e) { }
+  }
+
+  const crearGrupo = async (productoId) => {
+    if (!nuevoGrupo.nombre) return
+    try {
+      await axios.post(`${API}/menu/productos/${productoId}/grupos`, nuevoGrupo, { headers })
+      setNuevoGrupo({ nombre: '', obligatorio: false, seleccion_multiple: false })
+      cargar()
+    } catch (e) { alert('Error al crear el grupo') }
+  }
+
+  const eliminarGrupo = async (grupoId) => {
+    if (!confirm('¿Eliminar este grupo de opciones? Se borran también sus opciones.')) return
+    try {
+      await axios.delete(`${API}/menu/grupos/${grupoId}`, { headers })
+      cargar()
+    } catch (e) { }
+  }
+
+  const agregarOpcion = async (grupoId) => {
+    const datos = nuevaOpcion[grupoId]
+    if (!datos?.nombre) return
+    try {
+      await axios.post(`${API}/menu/grupos/${grupoId}/opciones`, {
+        nombre: datos.nombre,
+        precio_extra: parseFloat(datos.precio_extra) || 0
+      }, { headers })
+      setNuevaOpcion(prev => ({ ...prev, [grupoId]: { nombre: '', precio_extra: '' } }))
+      cargar()
+    } catch (e) { alert('Error al agregar la opción') }
+  }
+
+  const eliminarOpcion = async (opcionId) => {
+    try {
+      await axios.delete(`${API}/menu/opciones/${opcionId}`, { headers })
+      cargar()
+    } catch (e) { }
+  }
+
+  const inputStyle = {
+    border: '1.5px solid #e0e0e0', borderRadius: 10,
+    padding: '10px 12px', fontSize: 14, outline: 'none',
+    fontFamily: 'inherit', background: '#fafafa',
+  }
+
+  // ── Bloque reutilizable "Vista 3D/AR" ──
+  const BloqueAR = ({ valores, onChange }) => (
+    <div style={{ gridColumn: '1/-1', background: '#fff7ed', borderRadius: 12, padding: 12, border: '1.5px dashed #fdba74' }}>
+      <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 12, color: '#c2410c' }}>📱 Vista 3D / Realidad Aumentada (opcional)</p>
+      <div style={{ display: 'flex', gap: 8, marginBottom: valores.tipo_ar ? 8 : 0 }}>
+        <select value={valores.tipo_ar}
+          onChange={e => onChange({ ...valores, tipo_ar: e.target.value, medida_ar: '', medida_ar_2: '' })}
+          style={{ ...inputStyle, flex: 1, fontSize: 13, padding: '8px 10px' }}>
+          <option value="">Sin vista 3D</option>
+          <option value="pizza">🍕 Pizza</option>
+          <option value="hamburguesa">🍔 Hamburguesa</option>
+          <option value="sandwich_lomito">🥪 Sándwich de lomito</option>
+          <option value="chivito">🥖 Chivito</option>
+          <option value="lomito_arabe">🌯 Lomito árabe</option>
+        </select>
+      </div>
+
+      {valores.tipo_ar === 'pizza' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 12, color: '#9a3412', flexShrink: 0 }}>Diámetro:</label>
+          <input type="number" min="1" step="0.5"
+            value={valores.medida_ar}
+            onChange={e => onChange({ ...valores, medida_ar: e.target.value })}
+            placeholder="Ej: 30" style={{ ...inputStyle, width: 90, fontSize: 13, padding: '7px 10px' }} />
+          <span style={{ fontSize: 12, color: '#9a3412' }}>cm</span>
+        </div>
+      )}
+
+      {valores.tipo_ar === 'hamburguesa' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 12, color: '#9a3412', flexShrink: 0 }}>Capas de carne:</label>
+          <input type="number" min="1" max="3" step="1"
+            value={valores.medida_ar}
+            onChange={e => onChange({ ...valores, medida_ar: e.target.value })}
+            placeholder="Ej: 2" style={{ ...inputStyle, width: 70, fontSize: 13, padding: '7px 10px' }} />
+        </div>
+      )}
+
+      {valores.tipo_ar === 'sandwich_lomito' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 12, color: '#9a3412', flexShrink: 0 }}>Diámetro:</label>
+          <input type="number" min="1" step="0.5"
+            value={valores.medida_ar}
+            onChange={e => onChange({ ...valores, medida_ar: e.target.value })}
+            placeholder="Ej: 12" style={{ ...inputStyle, width: 90, fontSize: 13, padding: '7px 10px' }} />
+          <span style={{ fontSize: 12, color: '#9a3412' }}>cm</span>
+        </div>
+      )}
+
+      {valores.tipo_ar === 'chivito' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 12, color: '#9a3412', flexShrink: 0 }}>Longitud:</label>
+          <input type="number" min="1" step="0.5"
+            value={valores.medida_ar}
+            onChange={e => onChange({ ...valores, medida_ar: e.target.value })}
+            placeholder="Ej: 25" style={{ ...inputStyle, width: 90, fontSize: 13, padding: '7px 10px' }} />
+          <span style={{ fontSize: 12, color: '#9a3412' }}>cm</span>
+        </div>
+      )}
+
+      {valores.tipo_ar === 'lomito_arabe' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 12, color: '#9a3412', flexShrink: 0, width: 66 }}>Longitud:</label>
+            <input type="number" min="1" step="0.5"
+              value={valores.medida_ar}
+              onChange={e => onChange({ ...valores, medida_ar: e.target.value })}
+              placeholder="Ej: 20" style={{ ...inputStyle, width: 90, fontSize: 13, padding: '7px 10px' }} />
+            <span style={{ fontSize: 12, color: '#9a3412' }}>cm</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 12, color: '#9a3412', flexShrink: 0, width: 66 }}>Diámetro:</label>
+            <input type="number" min="1" step="0.5"
+              value={valores.medida_ar_2}
+              onChange={e => onChange({ ...valores, medida_ar_2: e.target.value })}
+              placeholder="Ej: 8" style={{ ...inputStyle, width: 90, fontSize: 13, padding: '7px 10px' }} />
+            <span style={{ fontSize: 12, color: '#9a3412' }}>cm</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  const textoMedidaAR = (p) => {
+    if (p.tipo_ar === 'hamburguesa') return `${p.medida_ar} capas`
+    if (p.tipo_ar === 'chivito') return `${p.medida_ar} cm largo`
+    if (p.tipo_ar === 'lomito_arabe') return `${p.medida_ar}×${p.medida_ar_2} cm`
+    return `${p.medida_ar} cm`
+  }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'linear-gradient(180deg, #0B1A33 0%, #0F2340 100%)' }}>
-      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+    <div style={{ minHeight: '100vh', background: '#f0f2f5', fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
 
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '18px 20px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, rgba(11,26,51,0.9) 0%, rgba(11,26,51,0) 100%)' }}>
-        <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '0.06em', color: '#F4F1EA', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E24B3D' }} />
-          VALMAI
-        </div>
-        <button onClick={onClose} style={{ background: 'rgba(244,241,234,0.15)', color: '#F4F1EA', border: 'none', borderRadius: 20, padding: '7px 14px', fontSize: 13, cursor: 'pointer' }}>
-          ✕ Cerrar
-        </button>
+      <div style={{ background: '#1a1a2e', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={() => navigate('/dashboard')} style={{
+          background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none',
+          borderRadius: 20, padding: '7px 14px', cursor: 'pointer', fontSize: 13
+        }}>← Volver</button>
+        <h1 style={{ color: 'white', margin: 0, fontSize: 17, fontWeight: 700 }}>Gestión del menú</h1>
       </div>
 
-      <div style={{ position: 'absolute', top: 60, left: 20, color: '#F4F1EA' }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{producto.nombre}</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#B9C4D8' }}>{medidaTexto}</p>
-      </div>
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {cargando && (
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: 12, color: '#7C8AA3' }}>
-          Cargando vista 3D...
+        <div style={{ background: 'white', borderRadius: 14, padding: 16, border: '1px solid #efefef' }}>
+          <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 13, color: '#999', letterSpacing: 1, textTransform: 'uppercase' }}>Nueva categoría</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={nuevaCat} onChange={e => setNuevaCat(e.target.value)}
+              placeholder="Ej: Lomitos, Bebidas, Postres"
+              style={{ ...inputStyle, flex: 1 }} />
+            <button onClick={crearCategoria} style={{
+              background: '#22c55e', color: 'white', border: 'none',
+              borderRadius: 10, padding: '10px 18px', fontWeight: 700, cursor: 'pointer', fontSize: 14
+            }}>+ Agregar</button>
+          </div>
         </div>
-      )}
 
-      {mostrarHintMesa && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: 'rgba(0,0,0,0.75)', color: 'white', padding: '16px 24px', borderRadius: 14,
-          fontSize: 14, fontWeight: 600, textAlign: 'center', zIndex: 20, maxWidth: 260,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8
-        }}>
-          <span style={{ fontSize: 28 }}>📷</span>
-          Apuntá la cámara hacia tu mesa y esperá unos segundos
+        <div style={{ background: 'white', borderRadius: 14, padding: 16, border: '1px solid #efefef' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: mostrarFormProd ? 14 : 0 }}>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: '#999', letterSpacing: 1, textTransform: 'uppercase' }}>Nuevo producto</p>
+            <button onClick={() => { setMostrarFormProd(!mostrarFormProd); setPreview(null) }} style={{
+              background: mostrarFormProd ? '#ef4444' : '#22c55e',
+              color: 'white', border: 'none', borderRadius: 10,
+              padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600
+            }}>
+              {mostrarFormProd ? '✕ Cancelar' : '+ Agregar producto'}
+            </button>
+          </div>
+
+          {mostrarFormProd && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <select value={nuevoProducto.categoria_id}
+                onChange={e => setNuevoProducto({ ...nuevoProducto, categoria_id: e.target.value })}
+                style={{ ...inputStyle, gridColumn: '1/-1' }}>
+                <option value="">Seleccioná una categoría</option>
+                {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+              <input value={nuevoProducto.nombre}
+                onChange={e => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })}
+                placeholder="Nombre del producto" style={inputStyle} />
+              <input value={nuevoProducto.precio}
+                onChange={e => setNuevoProducto({ ...nuevoProducto, precio: e.target.value })}
+                placeholder="Precio en Gs." type="number" style={inputStyle} />
+              <input value={nuevoProducto.descripcion}
+                onChange={e => setNuevoProducto({ ...nuevoProducto, descripcion: e.target.value })}
+                placeholder="Descripción (opcional)"
+                style={{ ...inputStyle, gridColumn: '1/-1' }} />
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#555', display: 'block', marginBottom: 6 }}>
+                  ⏱ Tiempo de preparación (minutos)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input type="number" min="1" max="120"
+                    value={nuevoProducto.tiempo_prep}
+                    onChange={e => setNuevoProducto({ ...nuevoProducto, tiempo_prep: e.target.value })}
+                    style={{ ...inputStyle, width: 100 }} />
+                  <span style={{ fontSize: 12, color: '#999' }}>min</span>
+                </div>
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#555', display: 'block', marginBottom: 8 }}>
+                  Foto del producto
+                </label>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <label style={{
+                    background: '#f5f5f5', border: '2px dashed #ddd', borderRadius: 12,
+                    padding: '14px 20px', cursor: 'pointer', fontSize: 13, color: '#666',
+                    display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0
+                  }}>
+                    📷 {subiendo ? 'Subiendo...' : 'Foto / Galería'}
+                    <input type="file" accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={e => e.target.files[0] && subirFoto(e.target.files[0])} />
+                  </label>
+                  {preview && (
+                    <div style={{ position: 'relative' }}>
+                      <img src={preview} alt="preview" style={{ width: 72, height: 72, borderRadius: 10, objectFit: 'cover' }} />
+                      <button onClick={() => { setPreview(null); setNuevoProducto(prev => ({ ...prev, imagen_url: '' })) }}
+                        style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 11 }}>✕</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <BloqueAR valores={nuevoProducto} onChange={setNuevoProducto} />
+
+              <button onClick={crearProducto} disabled={subiendo} style={{
+                gridColumn: '1/-1',
+                background: subiendo ? '#ccc' : '#22c55e',
+                color: 'white', border: 'none', borderRadius: 10,
+                padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer'
+              }}>
+                Guardar producto
+              </button>
+            </div>
+          )}
         </div>
-      )}
 
-      <model-viewer ref={mvRef} ar ar-modes="webxr scene-viewer quick-look" ar-scale="fixed" camera-controls
-        style={{ position: 'fixed', width: 10, height: 10, opacity: 0, pointerEvents: 'none' }} />
+        {categorias.map(cat => (
+          <div key={cat.id} style={{ background: 'white', borderRadius: 14, padding: 16, border: '1px solid #efefef' }}>
+            <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 15, color: '#111' }}>{cat.nombre}</p>
+            {cat.productos.length === 0 && (
+              <p style={{ color: '#ccc', fontSize: 13 }}>Sin productos todavía</p>
+            )}
+            {cat.productos.map(p => (
+              <div key={p.id}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 0', borderBottom: (editando?.id === p.id || opcionesAbiertas === p.id) ? 'none' : '1px solid #f5f5f5',
+                  opacity: p.disponible ? 1 : 0.5
+                }}>
+                  {p.imagen_url
+                    ? <img src={p.imagen_url} alt={p.nombre} style={{ width: 54, height: 54, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                    : <div style={{ width: 54, height: 54, borderRadius: 10, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🍽️</div>
+                  }
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: '#111' }}>{p.nombre}</p>
+                    {p.descripcion && <p style={{ margin: '2px 0 0', fontSize: 12, color: '#aaa' }}>{p.descripcion}</p>}
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 3, flexWrap: 'wrap' }}>
+                      <p style={{ margin: 0, fontWeight: 700, color: '#22c55e', fontSize: 14 }}>Gs. {parseInt(p.precio).toLocaleString()}</p>
+                      <span style={{ fontSize: 11, color: '#aaa' }}>⏱ {p.tiempo_prep || 0} min</span>
+                      {p.grupos_opciones?.length > 0 && (
+                        <span style={{ fontSize: 11, color: '#7c3aed' }}>⚙️ {p.grupos_opciones.length} grupo(s)</span>
+                      )}
+                      {p.tipo_ar && (
+                        <span style={{ fontSize: 11, color: '#c2410c' }}>📱 {textoMedidaAR(p)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => toggleDisponible(p.id, p.disponible)} style={{
+                    background: p.disponible ? '#f0fdf4' : '#fff5f5',
+                    color: p.disponible ? '#16a34a' : '#dc2626',
+                    border: 'none', borderRadius: 8, padding: '6px 12px',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0
+                  }}>
+                    {p.disponible ? '✓ Disponible' : '✗ Agotado'}
+                  </button>
+                  <button onClick={() => {
+                    if (opcionesAbiertas === p.id) setOpcionesAbiertas(null)
+                    else { setOpcionesAbiertas(p.id); setEditando(null); setPreviewEdicion(null) }
+                  }} style={{
+                    background: opcionesAbiertas === p.id ? '#ede9fe' : '#f5f3ff',
+                    color: '#7c3aed', border: 'none',
+                    borderRadius: 8, padding: '6px 10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0
+                  }}>⚙️ Opciones</button>
+                  <button onClick={() => {
+                    if (editando?.id === p.id) { setEditando(null); setPreviewEdicion(null) }
+                    else {
+                      setEditando({
+                        id: p.id, nombre: p.nombre, precio: p.precio, descripcion: p.descripcion || '',
+                        tiempo_prep: p.tiempo_prep || 10, imagen_url: p.imagen_url || '',
+                        tipo_ar: p.tipo_ar || '', medida_ar: p.medida_ar ?? '', medida_ar_2: p.medida_ar_2 ?? ''
+                      })
+                      setPreviewEdicion(p.imagen_url || null)
+                      setOpcionesAbiertas(null)
+                    }
+                  }} style={{
+                    background: editando?.id === p.id ? '#dbeafe' : '#eff6ff',
+                    color: '#2563eb', border: 'none',
+                    borderRadius: 8, padding: '6px 10px', fontSize: 16, cursor: 'pointer', flexShrink: 0
+                  }}>✏️</button>
+                  <button onClick={() => eliminarProducto(p.id)} style={{
+                    background: '#fff5f5', color: '#ef4444', border: 'none',
+                    borderRadius: 8, padding: '6px 10px', fontSize: 16, cursor: 'pointer', flexShrink: 0
+                  }}>🗑</button>
+                </div>
 
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(15, 35, 64, 0.85)', backdropFilter: 'blur(14px)', borderTop: '1px solid rgba(244,241,234,0.1)', padding: '18px 20px calc(18px + env(safe-area-inset-bottom))' }}>
-        <button onClick={activarAR} disabled={abriendoAR} style={{
-          width: '100%', padding: '13px 0', borderRadius: 10, border: 'none',
-          background: '#F4F1EA', color: '#0B1A33', fontWeight: 700, fontSize: 14,
-          cursor: abriendoAR ? 'default' : 'pointer', opacity: abriendoAR ? 0.6 : 1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-        }}>
-          {abriendoAR ? '⏳ Abriendo cámara...' : '📱 Ver en tu mesa (AR)'}
-        </button>
-        <p style={{ textAlign: 'center', fontSize: 11, color: error ? '#f87171' : '#7C8AA3', marginTop: 8 }}>
-          {error || 'Arrastrá para girar el modelo'}
-        </p>
+                {editando?.id === p.id && (
+                  <div style={{ margin: '8px 0 12px', background: '#f0f6ff', borderRadius: 12, padding: 14, border: '1.5px solid #bfdbfe', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 12, color: '#2563eb' }}>✏️ Editando: {p.nombre}</p>
+                    <input value={editando.nombre} onChange={e => setEditando({ ...editando, nombre: e.target.value })}
+                      placeholder="Nombre" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+                    <input value={editando.precio} onChange={e => setEditando({ ...editando, precio: e.target.value })}
+                      placeholder="Precio en Gs." type="number" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+                    <input value={editando.descripcion} onChange={e => setEditando({ ...editando, descripcion: e.target.value })}
+                      placeholder="Descripción (opcional)" style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 12, color: '#555', fontWeight: 600, flexShrink: 0 }}>⏱ Tiempo prep:</label>
+                      <input value={editando.tiempo_prep} onChange={e => setEditando({ ...editando, tiempo_prep: e.target.value })}
+                        type="number" min="1" max="120" style={{ ...inputStyle, width: 80 }} />
+                      <span style={{ fontSize: 12, color: '#aaa' }}>min</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <label style={{ background: '#f5f5f5', border: '2px dashed #ddd', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#666', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        📷 {subiendo ? 'Subiendo...' : 'Cambiar foto'}
+                        <input type="file" accept="image/*" style={{ display: 'none' }}
+                          onChange={e => e.target.files[0] && subirFotoEdicion(e.target.files[0])} />
+                      </label>
+                      {previewEdicion && (
+                        <div style={{ position: 'relative' }}>
+                          <img src={previewEdicion} alt="preview" style={{ width: 60, height: 60, borderRadius: 10, objectFit: 'cover' }} />
+                          <button onClick={() => { setPreviewEdicion(null); setEditando(prev => ({ ...prev, imagen_url: '' })) }}
+                            style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 11 }}>✕</button>
+                        </div>
+                      )}
+                    </div>
+
+                    <BloqueAR valores={editando} onChange={setEditando} />
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={editarProducto} disabled={subiendo} style={{ flex: 1, background: subiendo ? '#ccc' : '#2563eb', color: 'white', border: 'none', borderRadius: 10, padding: '11px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                        ✓ Guardar cambios
+                      </button>
+                      <button onClick={() => { setEditando(null); setPreviewEdicion(null) }} style={{ flex: 1, background: '#f5f5f5', color: '#666', border: 'none', borderRadius: 10, padding: '11px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {opcionesAbiertas === p.id && (
+                  <div style={{ margin: '8px 0 12px', background: '#faf5ff', borderRadius: 12, padding: 14, border: '1.5px solid #ddd6fe', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 12, color: '#7c3aed' }}>⚙️ Opciones de: {p.nombre}</p>
+
+                    {p.grupos_opciones?.map(g => (
+                      <div key={g.id} style={{ background: 'white', borderRadius: 10, padding: 12, border: '1px solid #eee' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <div>
+                            <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>{g.nombre}</p>
+                            <p style={{ margin: '2px 0 0', fontSize: 11, color: '#999' }}>
+                              {g.obligatorio ? 'Obligatorio · elegir 1' : 'Opcional'} · {g.seleccion_multiple ? 'elegir varios' : 'elegir uno'}
+                            </p>
+                          </div>
+                          <button onClick={() => eliminarGrupo(g.id)} style={{
+                            background: '#fff5f5', color: '#ef4444', border: 'none',
+                            borderRadius: 8, padding: '5px 9px', fontSize: 13, cursor: 'pointer'
+                          }}>🗑</button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                          {g.opciones?.map(o => (
+                            <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa', borderRadius: 8, padding: '6px 10px' }}>
+                              <span style={{ fontSize: 13 }}>{o.nombre}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700 }}>
+                                  {o.precio_extra > 0 ? `+Gs. ${o.precio_extra.toLocaleString()}` : 'Sin costo'}
+                                </span>
+                                <button onClick={() => eliminarOpcion(o.id)} style={{
+                                  background: 'none', color: '#ef4444', border: 'none',
+                                  fontSize: 13, cursor: 'pointer', padding: 0
+                                }}>✕</button>
+                              </div>
+                            </div>
+                          ))}
+                          {(!g.opciones || g.opciones.length === 0) && (
+                            <p style={{ margin: 0, fontSize: 12, color: '#ccc' }}>Sin opciones todavía</p>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input
+                            value={nuevaOpcion[g.id]?.nombre || ''}
+                            onChange={e => setNuevaOpcion(prev => ({ ...prev, [g.id]: { ...prev[g.id], nombre: e.target.value } }))}
+                            placeholder="Ej: Mediana, Doble muzza"
+                            style={{ ...inputStyle, flex: 1, padding: '7px 10px', fontSize: 13 }} />
+                          <input
+                            value={nuevaOpcion[g.id]?.precio_extra || ''}
+                            onChange={e => setNuevaOpcion(prev => ({ ...prev, [g.id]: { ...prev[g.id], precio_extra: e.target.value } }))}
+                            placeholder="+Gs" type="number"
+                            style={{ ...inputStyle, width: 90, padding: '7px 10px', fontSize: 13 }} />
+                          <button onClick={() => agregarOpcion(g.id)} style={{
+                            background: '#7c3aed', color: 'white', border: 'none',
+                            borderRadius: 8, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                          }}>+</button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {(!p.grupos_opciones || p.grupos_opciones.length === 0) && (
+                      <p style={{ margin: 0, fontSize: 12, color: '#aaa' }}>Este producto todavía no tiene grupos de opciones.</p>
+                    )}
+
+                    <div style={{ background: 'white', borderRadius: 10, padding: 12, border: '1.5px dashed #ddd6fe' }}>
+                      <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 12, color: '#7c3aed' }}>+ Nuevo grupo de opciones</p>
+                      <input
+                        value={nuevoGrupo.nombre}
+                        onChange={e => setNuevoGrupo({ ...nuevoGrupo, nombre: e.target.value })}
+                        placeholder="Ej: Tamaño, Extras, Punto de cocción"
+                        style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 8, fontSize: 13 }} />
+                      <div style={{ display: 'flex', gap: 14, marginBottom: 10 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={nuevoGrupo.obligatorio}
+                            onChange={e => setNuevoGrupo({ ...nuevoGrupo, obligatorio: e.target.checked })} />
+                          Obligatorio (ej: tamaño)
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#555', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={nuevoGrupo.seleccion_multiple}
+                            onChange={e => setNuevoGrupo({ ...nuevoGrupo, seleccion_multiple: e.target.checked })} />
+                          Elegir varios (ej: extras)
+                        </label>
+                      </div>
+                      <button onClick={() => crearGrupo(p.id)} style={{
+                        background: '#7c3aed', color: 'white', border: 'none',
+                        borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', width: '100%'
+                      }}>Crear grupo</button>
+                    </div>
+
+                    <button onClick={() => setOpcionesAbiertas(null)} style={{
+                      background: '#f5f5f5', color: '#666', border: 'none',
+                      borderRadius: 8, padding: '9px', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                    }}>Cerrar</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   )
