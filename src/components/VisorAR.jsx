@@ -31,10 +31,10 @@ const MODELOS_REALISTAS = {
     url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783203584/chivito_1_tkxk9z.glb',
     rotacionX: 0,
   },
-  lomito_arabe: {
-    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783203601/lomito-arabe_r1tgu4.glb',
+lomito_arabe: {
+    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783208458/lomito-arabe-v2_upodtq.glb',
     rotacionX: 0,
-    rotacionZ: -0.3,
+    rotacionZ: 0,
   },
 }
 
