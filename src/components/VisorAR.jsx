@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 const THREE_URL = 'three'
 const GLTF_EXPORTER_URL = 'three/addons/exporters/GLTFExporter.js'
 const USDZ_EXPORTER_URL = 'three/addons/exporters/USDZExporter.js'
+const ROOM_ENV_URL = 'three/addons/environments/RoomEnvironment.js'
 
 export default function VisorAR({ producto, onClose }) {
   const containerRef = useRef(null)
@@ -26,6 +27,7 @@ export default function VisorAR({ producto, onClose }) {
       const THREE = await import(/* @vite-ignore */ THREE_URL)
       const { GLTFExporter } = await import(/* @vite-ignore */ GLTF_EXPORTER_URL)
       const { USDZExporter } = await import(/* @vite-ignore */ USDZ_EXPORTER_URL)
+      const { RoomEnvironment } = await import(/* @vite-ignore */ ROOM_ENV_URL)
       if (cancelado) return
       modulesRef.current = { THREE, GLTFExporter, USDZExporter }
 
@@ -39,7 +41,16 @@ export default function VisorAR({ producto, onClose }) {
       renderer.setSize(container.clientWidth, container.clientHeight)
       renderer.setPixelRatio(window.devicePixelRatio)
       renderer.shadowMap.enabled = true
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1.1
+      renderer.outputColorSpace = THREE.SRGBColorSpace
       container.appendChild(renderer.domElement)
+
+      // Iluminación ambiente realista (reflejos suaves, como un estudio de fotografía de comida)
+      const pmremGenerator = new THREE.PMREMGenerator(renderer)
+      scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
+      pmremGenerator.dispose()
 
       const tableGeo = new THREE.CircleGeometry(9, 64)
       const tableMat = new THREE.MeshStandardMaterial({ color: 0x2a3a52, roughness: 0.85 })
@@ -94,15 +105,24 @@ export default function VisorAR({ producto, onClose }) {
         return tex
       }
       function makePattyTexture() {
-        const size = 512
+        const size = 1024
         const c = document.createElement('canvas')
         c.width = size; c.height = size
         const ctx = c.getContext('2d')
         ctx.fillStyle = '#5C3A28'; ctx.fillRect(0,0,size,size)
-        for (let i=0;i<160;i++){
+        // marcas de parrilla — la señal visual más fuerte de "carne real cocinada"
+        ctx.strokeStyle = 'rgba(20,10,5,0.55)'
+        ctx.lineWidth = size * 0.035
+        for (let i = -2; i < 6; i++) {
+          ctx.beginPath()
+          ctx.moveTo(i * size * 0.22, 0)
+          ctx.lineTo(i * size * 0.22 + size * 0.4, size)
+          ctx.stroke()
+        }
+        for (let i=0;i<320;i++){
           const x = Math.random()*size, y = Math.random()*size
           ctx.fillStyle = Math.random()>0.5 ? 'rgba(30,15,10,0.5)' : 'rgba(120,75,45,0.4)'
-          ctx.beginPath(); ctx.arc(x,y,2+Math.random()*4,0,Math.PI*2); ctx.fill()
+          ctx.beginPath(); ctx.arc(x,y,3+Math.random()*7,0,Math.PI*2); ctx.fill()
         }
         return new THREE.CanvasTexture(c)
       }
@@ -125,7 +145,7 @@ export default function VisorAR({ producto, onClose }) {
         return new THREE.CanvasTexture(c)
       }
       function makeCrustTexture() {
-        const size = 512
+        const size = 1024
         const c = document.createElement('canvas')
         c.width = size; c.height = size
         const ctx = c.getContext('2d')
@@ -169,7 +189,7 @@ export default function VisorAR({ producto, onClose }) {
           shape.lineTo(x, s + droop)
         }
         shape.lineTo(s, -s); shape.lineTo(-s, -s)
-        const mat = new THREE.MeshStandardMaterial({ color: 0xF2C332, roughness: 0.35, metalness: 0.1, side: THREE.DoubleSide })
+        const mat = new THREE.MeshPhysicalMaterial({ color: 0xF2C332, roughness: 0.3, metalness: 0.0, clearcoat: 0.5, clearcoatRoughness: 0.2, side: THREE.DoubleSide })
         const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat)
         mesh.rotation.x = -Math.PI/2
         return mesh
@@ -308,7 +328,7 @@ export default function VisorAR({ producto, onClose }) {
         rimMesh.castShadow = true
         group.add(rimMesh)
 
-        const top = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.86, 64), new THREE.MeshStandardMaterial({ map: makeCheeseTexture(), roughness: 0.45, metalness: 0.05 }))
+        const top = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.86, 64), new THREE.MeshPhysicalMaterial({ map: makeCheeseTexture(), roughness: 0.35, metalness: 0.0, clearcoat: 0.5, clearcoatRoughness: 0.25 }))
         top.rotation.x = -Math.PI / 2
         top.position.y = doughHeight + 0.05
         top.receiveShadow = true
@@ -410,7 +430,7 @@ export default function VisorAR({ producto, onClose }) {
     return () => mv.removeEventListener('ar-status', onArStatus)
   }, [])
 
- const activarAR = async () => {
+  const activarAR = async () => {
     if (abriendoAR || !groupRef.current || !modulesRef.current) return
     setAbriendoAR(true)
     setError(null)
