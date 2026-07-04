@@ -391,6 +391,20 @@ export default function VisorAR({ producto, onClose }) {
     }
   }, [producto])
 
+  // NUEVO: escucha el estado real del intento de AR (Scene Viewer / Quick Look)
+  useEffect(() => {
+    const mv = mvRef.current
+    if (!mv) return
+    const onArStatus = (event) => {
+      console.log('AR status:', event.detail.status)
+      if (event.detail.status === 'failed') {
+        setError('Este dispositivo no pudo abrir la cámara AR. Puede que falte "Google Play Services de AR" instalado (buscalo en Play Store).')
+      }
+    }
+    mv.addEventListener('ar-status', onArStatus)
+    return () => mv.removeEventListener('ar-status', onArStatus)
+  }, [])
+
   const activarAR = async () => {
     if (abriendoAR || !groupRef.current || !modulesRef.current) return
     setAbriendoAR(true)
@@ -403,20 +417,24 @@ export default function VisorAR({ producto, onClose }) {
       })
       const glbUrl = URL.createObjectURL(new Blob([glbBuffer], { type: 'model/gltf-binary' }))
 
-      const usdzExporter = new USDZExporter()
-      const usdzBuffer = await usdzExporter.parseAsync(groupRef.current)
-      const usdzUrl = URL.createObjectURL(new Blob([usdzBuffer], { type: 'model/vnd.usdz+zip' }))
-
       const mv = mvRef.current
       mv.src = glbUrl
-      mv.iosSrc = usdzUrl
+
+      // USDZ es solo para iPhone — si falla, no debe bloquear Android
+      try {
+        const usdzExporter = new USDZExporter()
+        const usdzBuffer = await usdzExporter.parseAsync(groupRef.current)
+        mv.iosSrc = URL.createObjectURL(new Blob([usdzBuffer], { type: 'model/vnd.usdz+zip' }))
+      } catch (usdzErr) {
+        console.warn('No se pudo generar USDZ (solo afecta iPhone):', usdzErr)
+      }
 
       const launch = () => { mv.activateAR(); setAbriendoAR(false) }
       if (mv.loaded) launch()
       else mv.addEventListener('load', launch, { once: true })
     } catch (e) {
       console.error(e)
-      setError('No se pudo abrir la cámara AR en este dispositivo. Probá con Chrome (Android) o Safari (iPhone).')
+      setError('No se pudo generar el modelo 3D. Probá de nuevo.')
       setAbriendoAR(false)
     }
   }
