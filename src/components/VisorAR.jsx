@@ -410,16 +410,33 @@ export default function VisorAR({ producto, onClose }) {
     return () => mv.removeEventListener('ar-status', onArStatus)
   }, [])
 
-  const activarAR = async () => {
+ const activarAR = async () => {
     if (abriendoAR || !groupRef.current || !modulesRef.current) return
     setAbriendoAR(true)
     setError(null)
     setMostrarHintMesa(true)
     try {
-      const { GLTFExporter, USDZExporter } = modulesRef.current
+      const { THREE, GLTFExporter, USDZExporter } = modulesRef.current
+
+      // Clonamos el modelo y lo escalamos para que el tamaño REAL en la mesa
+      // coincida exactamente con los centímetros que cargó el dueño.
+      const clone = groupRef.current.clone(true)
+      clone.updateMatrixWorld(true)
+      const box = new THREE.Box3().setFromObject(clone)
+      const size = new THREE.Vector3()
+      box.getSize(size)
+      const diametroActualEnUnidades = Math.max(size.x, size.z)
+      const diametroObjetivoEnMetros = (producto.tipo_ar === 'pizza'
+        ? (producto.medida_ar || 30)
+        : 12) / 100
+      const factorEscala = diametroActualEnUnidades > 0
+        ? diametroObjetivoEnMetros / diametroActualEnUnidades
+        : 1
+      clone.scale.setScalar(factorEscala)
+
       const gltfExporter = new GLTFExporter()
       const glbBuffer = await new Promise((resolve, reject) => {
-        gltfExporter.parse(groupRef.current, resolve, reject, { binary: true })
+        gltfExporter.parse(clone, resolve, reject, { binary: true })
       })
       const glbUrl = URL.createObjectURL(new Blob([glbBuffer], { type: 'model/gltf-binary' }))
 
@@ -429,7 +446,7 @@ export default function VisorAR({ producto, onClose }) {
       // USDZ es solo para iPhone — si falla, no debe bloquear Android
       try {
         const usdzExporter = new USDZExporter()
-        const usdzBuffer = await usdzExporter.parseAsync(groupRef.current)
+        const usdzBuffer = await usdzExporter.parseAsync(clone)
         mv.iosSrc = URL.createObjectURL(new Blob([usdzBuffer], { type: 'model/vnd.usdz+zip' }))
       } catch (usdzErr) {
         console.warn('No se pudo generar USDZ (solo afecta iPhone):', usdzErr)
