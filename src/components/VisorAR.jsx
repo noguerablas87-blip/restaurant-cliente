@@ -4,6 +4,13 @@ const THREE_URL = 'three'
 const GLTF_EXPORTER_URL = 'three/addons/exporters/GLTFExporter.js'
 const USDZ_EXPORTER_URL = 'three/addons/exporters/USDZExporter.js'
 const ROOM_ENV_URL = 'three/addons/environments/RoomEnvironment.js'
+const GLTF_LOADER_URL = 'three/addons/loaders/GLTFLoader.js'
+
+// Modelos 3D realistas (generados con IA y hosteados en Cloudinary).
+// Si una categoría no tiene modelo acá, se usa el generador procedural como respaldo.
+const MODELOS_REALISTAS = {
+  pizza: 'https://res.cloudinary.com/dmunelwl2/image/upload/pizza-optimizado_xgw43d.glb',
+}
 
 export default function VisorAR({ producto, onClose }) {
   const containerRef = useRef(null)
@@ -28,6 +35,7 @@ export default function VisorAR({ producto, onClose }) {
       const { GLTFExporter } = await import(/* @vite-ignore */ GLTF_EXPORTER_URL)
       const { USDZExporter } = await import(/* @vite-ignore */ USDZ_EXPORTER_URL)
       const { RoomEnvironment } = await import(/* @vite-ignore */ ROOM_ENV_URL)
+      const { GLTFLoader } = await import(/* @vite-ignore */ GLTF_LOADER_URL)
       if (cancelado) return
       modulesRef.current = { THREE, GLTFExporter, USDZExporter }
 
@@ -110,7 +118,6 @@ export default function VisorAR({ producto, onClose }) {
         c.width = size; c.height = size
         const ctx = c.getContext('2d')
         ctx.fillStyle = '#5C3A28'; ctx.fillRect(0,0,size,size)
-        // marcas de parrilla — la señal visual más fuerte de "carne real cocinada"
         ctx.strokeStyle = 'rgba(20,10,5,0.55)'
         ctx.lineWidth = size * 0.035
         for (let i = -2; i < 6; i++) {
@@ -357,13 +364,44 @@ export default function VisorAR({ producto, onClose }) {
         return { group, cameraDistance: radius * 2.6, cameraTargetY: totalHeight * 0.3 }
       }
 
+      // ---- carga de modelos 3D realistas (generados con IA), hosteados en Cloudinary ----
+      async function cargarModeloRealista(url) {
+        const loader = new GLTFLoader()
+        const gltf = await loader.loadAsync(url)
+        const group = gltf.scene
+
+        group.traverse((obj) => {
+          if (obj.isMesh) {
+            obj.castShadow = true
+            obj.receiveShadow = true
+          }
+        })
+
+        // Centramos el modelo y lo apoyamos sobre la "mesa" (y=0),
+        // igual que hacen los modelos procedurales.
+        const box = new THREE.Box3().setFromObject(group)
+        const size = new THREE.Vector3()
+        const center = new THREE.Vector3()
+        box.getSize(size)
+        box.getCenter(center)
+        group.position.set(-center.x, -box.min.y, -center.z)
+
+        const totalHeight = size.y
+        const maxDim = Math.max(size.x, size.z, totalHeight)
+        return { group, cameraDistance: maxDim * 2.4, cameraTargetY: totalHeight * 0.45 }
+      }
+
       // ---- armar según el producto real ----
       let result
-      if (producto.tipo_ar === 'pizza') {
+      const modeloRealista = MODELOS_REALISTAS[producto.tipo_ar]
+      if (modeloRealista) {
+        result = await cargarModeloRealista(modeloRealista)
+      } else if (producto.tipo_ar === 'pizza') {
         result = buildPizza(producto.medida_ar || 30, 8)
       } else {
         result = buildBurger(12, Math.max(1, Math.round(producto.medida_ar || 2)))
       }
+      if (cancelado) return
 
       groupRef.current = result.group
       scene.add(result.group)
