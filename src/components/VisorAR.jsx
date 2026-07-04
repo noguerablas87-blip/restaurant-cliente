@@ -7,9 +7,14 @@ const ROOM_ENV_URL = 'three/addons/environments/RoomEnvironment.js'
 const GLTF_LOADER_URL = 'three/addons/loaders/GLTFLoader.js'
 
 // Modelos 3D realistas (generados con IA y hosteados en Cloudinary).
-// Si una categoría no tiene modelo acá, se usa el generador procedural como respaldo.
+// rotacionX corrige la orientación: muchos generadores de imagen-a-3D arman
+// el modelo "parado" (mirando hacia la cámara de la foto original) en vez de
+// "acostado" mirando hacia arriba, como debe quedar sobre la mesa.
 const MODELOS_REALISTAS = {
-  pizza: 'https://res.cloudinary.com/dmunelwl2/image/upload/pizza-optimizado_xgw43d.glb',
+  pizza: {
+    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/pizza-optimizado_xgw43d.glb',
+    rotacionX: -Math.PI / 2,
+  },
 }
 
 export default function VisorAR({ producto, onClose }) {
@@ -55,7 +60,6 @@ export default function VisorAR({ producto, onClose }) {
       renderer.outputColorSpace = THREE.SRGBColorSpace
       container.appendChild(renderer.domElement)
 
-      // Iluminación ambiente realista (reflejos suaves, como un estudio de fotografía de comida)
       const pmremGenerator = new THREE.PMREMGenerator(renderer)
       scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture
       pmremGenerator.dispose()
@@ -365,7 +369,7 @@ export default function VisorAR({ producto, onClose }) {
       }
 
       // ---- carga de modelos 3D realistas (generados con IA), hosteados en Cloudinary ----
-      async function cargarModeloRealista(url) {
+      async function cargarModeloRealista(url, correccionRotX = 0) {
         const loader = new GLTFLoader()
         const gltf = await loader.loadAsync(url)
         const group = gltf.scene
@@ -377,25 +381,37 @@ export default function VisorAR({ producto, onClose }) {
           }
         })
 
-        // Centramos el modelo y lo apoyamos sobre la "mesa" (y=0),
-        // igual que hacen los modelos procedurales.
+        // Corrige la orientación: el generador arma el modelo "parado"
+        // (mirando hacia la cámara de la foto original), lo giramos para
+        // que quede acostado, mirando hacia arriba, como sobre una mesa.
+        if (correccionRotX) {
+          group.rotation.x = correccionRotX
+        }
+        group.updateMatrixWorld(true)
+
         const box = new THREE.Box3().setFromObject(group)
         const size = new THREE.Vector3()
         const center = new THREE.Vector3()
         box.getSize(size)
         box.getCenter(center)
+
+        // Reacomodamos: centrado en X/Z, apoyado sobre la mesa en Y=0.
+        // Como ya rotamos el group, aplicamos el offset sobre un contenedor
+        // nuevo para no pisar la rotación ya aplicada.
+        const wrapper = new THREE.Group()
+        wrapper.add(group)
         group.position.set(-center.x, -box.min.y, -center.z)
 
         const totalHeight = size.y
         const maxDim = Math.max(size.x, size.z, totalHeight)
-        return { group, cameraDistance: maxDim * 2.4, cameraTargetY: totalHeight * 0.45 }
+        return { group: wrapper, cameraDistance: maxDim * 2.4, cameraTargetY: totalHeight * 0.45 }
       }
 
       // ---- armar según el producto real ----
       let result
       const modeloRealista = MODELOS_REALISTAS[producto.tipo_ar]
       if (modeloRealista) {
-        result = await cargarModeloRealista(modeloRealista)
+        result = await cargarModeloRealista(modeloRealista.url, modeloRealista.rotacionX || 0)
       } else if (producto.tipo_ar === 'pizza') {
         result = buildPizza(producto.medida_ar || 30, 8)
       } else {
@@ -450,7 +466,6 @@ export default function VisorAR({ producto, onClose }) {
     }
   }, [producto])
 
-  // Escucha el estado real del intento de AR (Scene Viewer / Quick Look)
   useEffect(() => {
     const mv = mvRef.current
     if (!mv) return
@@ -476,8 +491,6 @@ export default function VisorAR({ producto, onClose }) {
     try {
       const { THREE, GLTFExporter, USDZExporter } = modulesRef.current
 
-      // Clonamos el modelo y lo escalamos para que el tamaño REAL en la mesa
-      // coincida exactamente con los centímetros que cargó el dueño.
       const clone = groupRef.current.clone(true)
       clone.updateMatrixWorld(true)
       const box = new THREE.Box3().setFromObject(clone)
@@ -501,7 +514,6 @@ export default function VisorAR({ producto, onClose }) {
       const mv = mvRef.current
       mv.src = glbUrl
 
-      // USDZ es solo para iPhone — si falla, no debe bloquear Android
       try {
         const usdzExporter = new USDZExporter()
         const usdzBuffer = await usdzExporter.parseAsync(clone)
