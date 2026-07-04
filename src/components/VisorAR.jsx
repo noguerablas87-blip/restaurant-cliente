@@ -7,9 +7,9 @@ const ROOM_ENV_URL = 'three/addons/environments/RoomEnvironment.js'
 const GLTF_LOADER_URL = 'three/addons/loaders/GLTFLoader.js'
 
 // Modelos 3D realistas (generados con IA y hosteados en Cloudinary).
-// rotacionX corrige la orientación: depende de si la foto original del
-// generador fue tomada desde arriba (necesita -90°, como pizza/sándwich
-// redondos) o de costado (no necesita rotación, como hamburguesa/chivito).
+// rotacionX corrige la orientación (parado vs acostado).
+// rotacionZ corrige inclinaciones residuales (cuando la foto original
+// del generador fue tomada en diagonal, tipo "foto de food blogger").
 const MODELOS_REALISTAS = {
   pizza: {
     url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783192856/pizza-optimizado_xgw43d.glb',
@@ -34,6 +34,7 @@ const MODELOS_REALISTAS = {
   lomito_arabe: {
     url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783203601/lomito-arabe_r1tgu4.glb',
     rotacionX: 0,
+    rotacionZ: -0.3,
   },
 }
 
@@ -389,7 +390,7 @@ export default function VisorAR({ producto, onClose }) {
       }
 
       // ---- carga de modelos 3D realistas (generados con IA), hosteados en Cloudinary ----
-      async function cargarModeloRealista(url, correccionRotX = 0) {
+      async function cargarModeloRealista(url, correccionRotX = 0, correccionRotZ = 0) {
         const loader = new GLTFLoader()
         const gltf = await loader.loadAsync(url)
         const group = gltf.scene
@@ -403,6 +404,9 @@ export default function VisorAR({ producto, onClose }) {
 
         if (correccionRotX) {
           group.rotation.x = correccionRotX
+        }
+        if (correccionRotZ) {
+          group.rotation.z = correccionRotZ
         }
         group.updateMatrixWorld(true)
 
@@ -427,18 +431,16 @@ export default function VisorAR({ producto, onClose }) {
       const configRealista = MODELOS_REALISTAS[tipo]
 
       if (configRealista?.porCapas) {
-        // hamburguesa: elige el modelo real según cantidad de capas
         const capas = Math.max(1, Math.min(3, Math.round(producto.medida_ar || 2)))
         const urlCapas = configRealista.porCapas[capas]
         if (urlCapas) {
-          result = await cargarModeloRealista(urlCapas, configRealista.rotacionX || 0)
+          result = await cargarModeloRealista(urlCapas, configRealista.rotacionX || 0, configRealista.rotacionZ || 0)
         }
       } else if (configRealista?.url) {
-        result = await cargarModeloRealista(configRealista.url, configRealista.rotacionX || 0)
+        result = await cargarModeloRealista(configRealista.url, configRealista.rotacionX || 0, configRealista.rotacionZ || 0)
       }
 
       if (!result) {
-        // Respaldo procedural, por si falta un modelo o falla la carga
         if (tipo === 'pizza') {
           result = buildPizza(producto.medida_ar || 30, 8)
         } else {
@@ -528,7 +530,6 @@ export default function VisorAR({ producto, onClose }) {
       const tipo = producto.tipo_ar
 
       if (tipo === 'lomito_arabe') {
-        // Escalado NO uniforme: un eje horizontal es la longitud, el otro el diámetro
         const longitudObjetivo = (producto.medida_ar || 20) / 100
         const diametroObjetivo = (producto.medida_ar_2 || 8) / 100
         const largoActual = Math.max(size.x, size.z)
@@ -548,7 +549,6 @@ export default function VisorAR({ producto, onClose }) {
         } else if (tipo === 'chivito') {
           diametroObjetivoEnMetros = (producto.medida_ar || 25) / 100
         } else {
-          // hamburguesa: tamaño físico fijo (medida_ar son capas, no cm)
           diametroObjetivoEnMetros = 12 / 100
         }
         const factorEscala = diametroActualEnUnidades > 0
