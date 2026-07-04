@@ -7,13 +7,21 @@ const ROOM_ENV_URL = 'three/addons/environments/RoomEnvironment.js'
 const GLTF_LOADER_URL = 'three/addons/loaders/GLTFLoader.js'
 
 // Modelos 3D realistas (generados con IA y hosteados en Cloudinary).
-// rotacionX corrige la orientación: muchos generadores de imagen-a-3D arman
-// el modelo "parado" (mirando hacia la cámara de la foto original) en vez de
-// "acostado" mirando hacia arriba, como debe quedar sobre la mesa.
+// rotacionX corrige la orientación: el generador arma el modelo "parado"
+// (mirando hacia la cámara de la foto original) en vez de "acostado"
+// mirando hacia arriba, como debe quedar sobre la mesa.
 const MODELOS_REALISTAS = {
   pizza: {
-    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/pizza-optimizado_xgw43d.glb',
+    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783192856/pizza-optimizado_xgw43d.glb',
     rotacionX: -Math.PI / 2,
+  },
+  hamburguesa: {
+    rotacionX: -Math.PI / 2,
+    porCapas: {
+      1: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197530/hamburguesa-simple_f5opyy.glb',
+      2: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197554/hamburguesa-doble_bywn4a.glb',
+      3: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197563/hamburguesa-triple_o8acbv.glb',
+    },
   },
 }
 
@@ -381,9 +389,6 @@ export default function VisorAR({ producto, onClose }) {
           }
         })
 
-        // Corrige la orientación: el generador arma el modelo "parado"
-        // (mirando hacia la cámara de la foto original), lo giramos para
-        // que quede acostado, mirando hacia arriba, como sobre una mesa.
         if (correccionRotX) {
           group.rotation.x = correccionRotX
         }
@@ -395,9 +400,6 @@ export default function VisorAR({ producto, onClose }) {
         box.getSize(size)
         box.getCenter(center)
 
-        // Reacomodamos: centrado en X/Z, apoyado sobre la mesa en Y=0.
-        // Como ya rotamos el group, aplicamos el offset sobre un contenedor
-        // nuevo para no pisar la rotación ya aplicada.
         const wrapper = new THREE.Group()
         wrapper.add(group)
         group.position.set(-center.x, -box.min.y, -center.z)
@@ -409,10 +411,19 @@ export default function VisorAR({ producto, onClose }) {
 
       // ---- armar según el producto real ----
       let result
-      const modeloRealista = MODELOS_REALISTAS[producto.tipo_ar]
-      if (modeloRealista) {
-        result = await cargarModeloRealista(modeloRealista.url, modeloRealista.rotacionX || 0)
-      } else if (producto.tipo_ar === 'pizza') {
+      const tipo = producto.tipo_ar
+
+      if (tipo === 'pizza' && MODELOS_REALISTAS.pizza) {
+        result = await cargarModeloRealista(MODELOS_REALISTAS.pizza.url, MODELOS_REALISTAS.pizza.rotacionX || 0)
+      } else if (tipo === 'hamburguesa' && MODELOS_REALISTAS.hamburguesa) {
+        const capas = Math.max(1, Math.min(3, Math.round(producto.medida_ar || 2)))
+        const urlHamburguesa = MODELOS_REALISTAS.hamburguesa.porCapas[capas]
+        if (urlHamburguesa) {
+          result = await cargarModeloRealista(urlHamburguesa, MODELOS_REALISTAS.hamburguesa.rotacionX || 0)
+        } else {
+          result = buildBurger(12, capas)
+        }
+      } else if (tipo === 'pizza') {
         result = buildPizza(producto.medida_ar || 30, 8)
       } else {
         result = buildBurger(12, Math.max(1, Math.round(producto.medida_ar || 2)))
