@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useCarrito } from '../context/CarritoContext'
+import VisorAR from '../components/VisorAR'
 
 const API = 'https://restaurant-backend-production-1271.up.railway.app'
 
@@ -22,6 +23,7 @@ export default function Menu() {
   const [pedidoActivo, setPedidoActivo] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pedidoActivo')) } catch { return null }
   })
+  const [productoAR, setProductoAR] = useState(null)
 
   // Verificar si el pedido activo sigue vigente
   useEffect(() => {
@@ -276,7 +278,7 @@ export default function Menu() {
               </div>
             )}
             {productosFiltrados.map(producto => (
-              <ProductoCard key={producto.id} producto={producto} color={color} cantidad={getCantidad(producto.id)} agregar={agregar} quitar={quitar} />
+              <ProductoCard key={producto.id} producto={producto} color={color} cantidad={getCantidad(producto.id)} agregar={agregar} quitar={quitar} onVerAR={setProductoAR} />
             ))}
           </div>
         )}
@@ -294,7 +296,7 @@ export default function Menu() {
               </h2>
             </div>
             {categoriaActual?.productos.map(producto => (
-              <ProductoCard key={producto.id} producto={producto} color={color} cantidad={getCantidad(producto.id)} agregar={agregar} quitar={quitar} />
+              <ProductoCard key={producto.id} producto={producto} color={color} cantidad={getCantidad(producto.id)} agregar={agregar} quitar={quitar} onVerAR={setProductoAR} />
             ))}
           </div>
         )}
@@ -342,11 +344,16 @@ export default function Menu() {
           </button>
         </div>
       )}
+
+      {/* ── VISOR AR ── */}
+      {productoAR && (
+        <VisorAR producto={productoAR} onClose={() => setProductoAR(null)} />
+      )}
     </div>
   )
 }
 
-function ProductoCard({ producto, color, cantidad, agregar, quitar }) {
+function ProductoCard({ producto, color, cantidad, agregar, quitar, onVerAR }) {
   return (
     <div style={{ margin: '0 14px 10px', background: '#1e1e1e', borderRadius: 16, overflow: 'hidden', border: '1px solid #2a2a2a', opacity: producto.disponible ? 1 : 0.4 }}>
       <div style={{ display: 'flex', gap: 0 }}>
@@ -369,6 +376,15 @@ function ProductoCard({ producto, color, cantidad, agregar, quitar }) {
               <button onClick={() => producto.disponible && agregar(producto)} style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: producto.disponible ? color : '#333', color: '#000', fontSize: 20, cursor: producto.disponible ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, lineHeight: 1 }}>+</button>
             )}
           </div>
+          {producto.tipo_ar && (
+            <button onClick={() => onVerAR(producto)} style={{
+              marginTop: 8, width: '100%', background: 'transparent', border: `1.5px solid ${color}`,
+              color: color, borderRadius: 10, padding: '8px 0', fontSize: 12, fontWeight: 700,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+            }}>
+              📱 Ver en tu mesa
+            </button>
+          )}
         </div>
         {producto.imagen_url ? (
           <img src={producto.imagen_url} alt={producto.nombre} style={{ width: 110, height: 110, objectFit: 'cover', flexShrink: 0 }} />
