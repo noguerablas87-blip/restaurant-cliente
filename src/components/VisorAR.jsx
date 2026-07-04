@@ -16,7 +16,7 @@ const MODELOS_REALISTAS = {
     rotacionX: -Math.PI / 2,
   },
   hamburguesa: {
-    rotacionX: -Math.PI / 2,
+    rotacionX: 0,
     porCapas: {
       1: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197530/hamburguesa-simple_f5opyy.glb',
       2: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783197554/hamburguesa-doble_bywn4a.glb',
