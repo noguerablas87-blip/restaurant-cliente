@@ -645,6 +645,9 @@ export default function VisorAR({ producto, onClose }) {
         <p style={{ textAlign: 'center', fontSize: 11, color: error ? '#f87171' : '#7C8AA3', marginTop: 8 }}>
           {error || 'Arrastrá para girar el modelo'}
         </p>
+        <p style={{ textAlign: 'center', fontSize: 10, color: '#5A6B85', marginTop: 6, lineHeight: 1.4 }}>
+          ⚠️ Imagen ilustrativa generada digitalmente. La presentación, ingredientes y tamaño reales pueden variar levemente respecto al producto entregado.
+        </p>
       </div>
     </div>
   )
