@@ -32,7 +32,7 @@ const MODELOS_REALISTAS = {
     rotacionX: 0,
   },
 lomito_arabe: {
-    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783208458/lomito-arabe-v2_upodtq.glb',
+    url: 'https://res.cloudinary.com/dmunelwl2/image/upload/v1783209906/lomito-arabe-v3_dr3fpx.glb',
     rotacionX: 0,
     rotacionZ: 0,
   },
